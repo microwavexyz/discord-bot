@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Verification Requests</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+  <script src="/socket.io/socket.io.js"></script>
+  <script src="/js/main.js" defer></script>
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+  <header class="bg-blue-600 p-4 shadow-md">
+    <h1 class="text-white text-2xl font-bold text-center">Solaris Bot Dashboard</h1>
+  </header>
+  <nav class="bg-blue-500 p-3 shadow-md">
+    <ul class="flex justify-center space-x-4">
+      <li><a href="/" class="text-white hover:text-gray-200 transition-colors duration-300">Home</a></li>
+      <li><a href="/users" class="text-white hover:text-gray-200 transition-colors duration-300">Users</a></li>
+      <li><a href="/verify-requests" class="text-white hover:text-gray-200 transition-colors duration-300">Verification Requests</a></li>
+      <li><a href="/completed-requests" class="text-white hover:text-gray-200 transition-colors duration-300">Completed Requests</a></li>
+    </ul>
+  </nav>
+  <main class="flex-grow p-6">
+    <div class="container mx-auto">
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <div class="mb-4 flex justify-between items-center">
+          <input type="text" id="searchInput" placeholder="Search by Username" class="p-2 border rounded w-1/3">
+          <select id="filterSelect" class="p-2 border rounded">
+            <option value="">All</option>
+            <option value="pending">Pending</option>
+            <option value="verified">Verified</option>
+          </select>
+        </div>
+        <div id="loading" class="hidden text-center py-4">Loading...</div>
+        <table class="min-w-full bg-white">
+          <thead>
+            <tr class="bg-blue-600 text-white">
+              <th class="py-2 px-4 text-left">User ID</th>
+              <th class="py-2 px-4 text-left">Username</th>
+              <th class="py-2 px-4 text-left">Verification Code</th>
+              <th class="py-2 px-4 text-left">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="requestTable"></tbody>
+        </table>
+        <div class="mt-4 flex justify-center">
+          <button id="prevPage" class="bg-blue-500 text-white py-1 px-4 rounded mr-2">Previous</button>
+          <button id="nextPage" class="bg-blue-500 text-white py-1 px-4 rounded">Next</button>
+        </div>
+      </div>
+    </div>
+  </main>
+  <script>
+    document.addEventListener('DOMContentLoaded', function() {
+      const searchInput = document.getElementById('searchInput');
+      const filterSelect = document.getElementById('filterSelect');
+      const requestTable = document.getElementById('requestTable');
+      const prevPage = document.getElementById('prevPage');
+      const nextPage = document.getElementById('nextPage');
+      const loading = document.getElementById('loading');
+
+      let currentPage = 1;
+      const itemsPerPage = 10;
+
+      async function fetchRequests() {
+        loading.classList.remove('hidden');
+        const searchTerm = searchInput.value.toLowerCase();
+        const filterTerm = filterSelect.value;
+        const response = await fetch(`/api/requests?page=${currentPage}&limit=${itemsPerPage}&search=${searchTerm}&filter=${filterTerm}`);
+        const data = await response.json();
+        renderTable(data.requests);
+        updatePagination(data.total);
+        loading.classList.add('hidden');
+      }
+
+      function renderTable(requests) {
+        requestTable.innerHTML = '';
+        requests.forEach(request => {
+          const row = document.createElement('tr');
+          row.classList.add('border-b', 'hover:bg-gray-100');
+          row.innerHTML = `
+            <td class="py-2 px-4">${request.userId}</td>
+            <td class="py-2 px-4">${request.user}</td>
+            <td class="py-2 px-4">${request.code}</td>
+            <td class="py-2 px-4">
+              <button class="bg-green-500 text-white py-1 px-2 rounded hover:bg-green-600 transition-colors duration-300" onclick="approveUser('${request.userId}')">Approve</button>
+            </td>
+          `;
+          requestTable.appendChild(row);
+        });
+      }
+
+      function updatePagination(totalItems) {
+        prevPage.disabled = currentPage === 1;
+        nextPage.disabled = currentPage * itemsPerPage >= totalItems;
+      }
+
+      searchInput.addEventListener('input', () => {
+        currentPage = 1;
+        fetchRequests();
+      });
+      filterSelect.addEventListener('change', () => {
+        currentPage = 1;
+        fetchRequests();
+      });
+      prevPage.addEventListener('click', () => {
+        if (currentPage > 1) {
+          currentPage--;
+          fetchRequests();
+        }
+      });
+      nextPage.addEventListener('click', () => {
+        currentPage++;
+        fetchRequests();
+      });
+
+      fetchRequests(); // Initial fetch
+
+      window.approveUser = async (userId) => {
+        const response = await fetch(`/manage-user`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ userId, action: 'approve' }),
+        });
+        const data = await response.json();
+        alert(data.message);
+        fetchRequests();
+      };
+    });
+  </script>
+</body>
+</html>

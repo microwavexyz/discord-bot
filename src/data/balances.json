@@ -1,0 +1,44 @@
+{
+  "users": {
+    "1020809619343409182": {
+      "balance": 490,
+      "lastClaimed": 1717313393623,
+      "username": ""
+    },
+    "1126278371844833380": {
+      "balance": 110,
+      "lastClaimed": 1716759563231,
+      "username": ""
+    },
+    "1103228441370832897": {
+      "balance": 1793545433843508,
+      "lastClaimed": 1716760488893,
+      "username": ""
+    },
+    "1244131334960709672": {
+      "balance": 99,
+      "lastClaimed": 0,
+      "username": ""
+    },
+    "960225879382958134": {
+      "balance": 100,
+      "lastClaimed": 1716778222450,
+      "username": ""
+    },
+    "736972552265793548": {
+      "balance": 1000000010,
+      "lastClaimed": 0,
+      "username": ""
+    },
+    "1145068116007718952": {
+      "balance": 500100,
+      "lastClaimed": 1716878182662,
+      "username": ""
+    },
+    "1210889494518169601": {
+      "balance": 100,
+      "lastClaimed": 1716938338808,
+      "username": ""
+    }
+  }
+}

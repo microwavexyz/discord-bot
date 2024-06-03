@@ -1,0 +1,29 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 min-h-screen flex flex-col">
+  <header class="bg-blue-600 p-4 shadow-md">
+    <h1 class="text-white text-2xl font-bold text-center">Solaris Bot Dashboard</h1>
+  </header>
+  <nav class="bg-blue-500 p-3 shadow-md">
+    <ul class="flex justify-center space-x-4">
+      <li><a href="/" class="text-white hover:text-gray-200 transition-colors duration-300">Home</a></li>
+      <li><a href="/users" class="text-white hover:text-gray-200 transition-colors duration-300">Users</a></li>
+      <li><a href="/verify-requests" class="text-white hover:text-gray-200 transition-colors duration-300">Verification Requests</a></li>
+      <li><a href="/completed-requests" class="text-white hover:text-gray-200 transition-colors duration-300">Completed Requests</a></li>
+    </ul>
+  </nav>
+  <main class="flex-grow p-6">
+    <div class="container mx-auto">
+      <div class="bg-white rounded-lg shadow-md p-6">
+        <p class="text-gray-700 text-lg">Welcome to the Solaris Bot Dashboard! Select a menu item to view data.</p>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

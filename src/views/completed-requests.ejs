@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Completed Verification Requests</title>
+  <link href="https://cdn.jsdelivr.net/npm/tailwindcss@2.2.19/dist/tailwind.min.css" rel="stylesheet">
+</head>
+<body class="bg-gray-100 flex flex-col min-h-screen">
+  <header class="bg-blue-600 p-4 shadow-md">
+    <h1 class="text-white text-2xl font-semibold text-center">Solaris Bot Dashboard</h1>
+  </header>
+  <nav class="bg-blue-500 p-3 shadow-md">
+    <ul class="flex justify-center space-x-4">
+      <li><a href="/" class="text-white hover:text-gray-200">Home</a></li>
+      <li><a href="/users" class="text-white hover:text-gray-200">Users</a></li>
+      <li><a href="/verify-requests" class="text-white hover:text-gray-200">Verification Requests</a></li>
+      <li><a href="/completed-requests" class="text-white hover:text-gray-200">Completed Requests</a></li>
+    </ul>
+  </nav>
+  <main class="flex-grow p-6">
+    <div class="container mx-auto">
+      <div class="bg-white rounded-lg shadow-md overflow-hidden">
+        <table class="min-w-full">
+          <thead class="bg-blue-600 text-white">
+            <tr>
+              <th class="py-3 px-4 text-left">User ID</th>
+              <th class="py-3 px-4 text-left">Username</th>
+            </tr>
+          </thead>
+          <tbody>
+            <% completedRequests.forEach(request => { %>
+              <tr class="border-b hover:bg-gray-100">
+                <td class="py-3 px-4"><%= request.userId %></td>
+                <td class="py-3 px-4"><%= request.user %></td>
+              </tr>
+            <% }) %>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </main>
+</body>
+</html>

@@ -1,0 +1,13 @@
+{
+    "faq": [
+      {
+        "question": "How can I join the server?",
+        "answer": "You can join the server by clicking on the invite link provided in the welcome channel."
+      },
+      {
+        "question": "What are the server rules?",
+        "answer": "The server rules are listed in the #rules channel. Please make sure to read them carefully."
+      }
+    ]
+  }
+  
