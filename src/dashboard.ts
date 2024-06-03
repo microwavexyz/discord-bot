@@ -16,7 +16,7 @@ const io = new Server(server);
 const port = process.env.PORT || 3000;
 
 // Dummy user data for authentication
-const users = [{ id: 1, username: 'admin', password: 'password' }];
+const users = [{ id: 1, username: '', password: '' }];
 
 // Passport.js setup
 passport.use(new LocalStrategy((username, password, done) => {
