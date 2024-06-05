@@ -37,12 +37,16 @@ export const command: Command = {
       });
 
       collector.on('collect', async (btnInteraction) => {
-        if (btnInteraction.customId === `answer_${answers.indexOf(correct_answer) + 1}`) {
+        const selectedAnswerIndex = parseInt(btnInteraction.customId.split('_')[1]) - 1;
+        const selectedAnswer = answers[selectedAnswerIndex];
+
+        if (selectedAnswer === correct_answer) {
           await btnInteraction.reply({ content: 'Correct!', ephemeral: true });
         } else {
           await btnInteraction.reply({ content: `Incorrect! The correct answer was **${correct_answer}**.`, ephemeral: true });
         }
-        await interaction.editReply({ content: 'Trivia ended.', embeds: [], components: [] });
+
+        await interaction.editReply({ embeds: [createResultEmbed(question, correct_answer, selectedAnswer)], components: [] });
         collector.stop();
       });
 
@@ -57,3 +61,18 @@ export const command: Command = {
     }
   },
 };
+
+/**
+ * Creates an embed showing the result of the trivia question.
+ * @param question The trivia question.
+ * @param correctAnswer The correct answer.
+ * @param selectedAnswer The answer selected by the user.
+ * @returns The created EmbedBuilder.
+ */
+function createResultEmbed(question: string, correctAnswer: string, selectedAnswer: string): EmbedBuilder {
+  return new EmbedBuilder()
+    .setTitle('Trivia Result')
+    .setDescription(`**Question:** ${question}\n\n**Correct Answer:** ${correctAnswer}\n**Your Answer:** ${selectedAnswer}`)
+    .setTimestamp()
+    .setColor(correctAnswer === selectedAnswer ? 'Green' : 'Red');
+}

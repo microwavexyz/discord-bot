@@ -15,64 +15,52 @@ export const command: Command = {
     const userId = interaction.user.id;
     const options = interaction.options as CommandInteractionOptionResolver;
     const guess = options.getInteger('guess', true);
-    let replyContent;
 
-    if (!activeGames.has(userId)) {
-      const number = Math.floor(Math.random() * 100) + 1;
-      activeGames.set(userId, { number, attempts: 0, guesses: [] });
-      replyContent = {
-        title: 'Guess the Number',
-        description: 'A new game has started! Try to guess the number between 1 and 100.',
-        color: 0x00AE86
-      };
-    } else {
-      const game = activeGames.get(userId);
-      game!.attempts++;
-      game!.guesses.push(guess);
-
-      if (guess === game!.number) {
-        replyContent = {
-          title: 'Guess the Number',
-          description: `Congratulations! You guessed the number ${game!.number} in ${game!.attempts} attempts!`,
-          fields: [{ name: 'Your Guesses', value: game!.guesses.join(', '), inline: true }],
-          color: 0x00AE86
-        };
-        activeGames.delete(userId);
-      } else if (guess < game!.number) {
-        replyContent = {
-          title: 'Guess the Number',
-          description: 'Too low! Try again.',
-          fields: [{ name: 'Your Guesses', value: game!.guesses.join(', '), inline: true }],
-          color: 0x00AE86
-        };
-      } else {
-        replyContent = {
-          title: 'Guess the Number',
-          description: 'Too high! Try again.',
-          fields: [{ name: 'Your Guesses', value: game!.guesses.join(', '), inline: true }],
-          color: 0x00AE86
-        };
-      }
-    }
-
-    const embed = new EmbedBuilder()
-      .setTitle(replyContent.title)
-      .setDescription(replyContent.description)
-      .setColor(replyContent.color);
-
-    if (replyContent.fields) {
-      embed.addFields(replyContent.fields);
-    }
+    let embed: EmbedBuilder;
 
     try {
+      if (!activeGames.has(userId)) {
+        const number = Math.floor(Math.random() * 100) + 1;
+        activeGames.set(userId, { number, attempts: 0, guesses: [] });
+        embed = new EmbedBuilder()
+          .setTitle('Guess the Number')
+          .setDescription('A new game has started! Try to guess the number between 1 and 100.')
+          .setColor(0x00AE86);
+      } else {
+        const game = activeGames.get(userId)!;
+        game.attempts++;
+        game.guesses.push(guess);
+
+        if (guess === game.number) {
+          embed = new EmbedBuilder()
+            .setTitle('Guess the Number')
+            .setDescription(`Congratulations! You guessed the number ${game.number} in ${game.attempts} attempts!`)
+            .addFields({ name: 'Your Guesses', value: game.guesses.join(', '), inline: true })
+            .setColor(0x00AE86);
+          activeGames.delete(userId);
+        } else if (guess < game.number) {
+          embed = new EmbedBuilder()
+            .setTitle('Guess the Number')
+            .setDescription('Too low! Try again.')
+            .addFields({ name: 'Your Guesses', value: game.guesses.join(', '), inline: true })
+            .setColor(0x00AE86);
+        } else {
+          embed = new EmbedBuilder()
+            .setTitle('Guess the Number')
+            .setDescription('Too high! Try again.')
+            .addFields({ name: 'Your Guesses', value: game.guesses.join(', '), inline: true })
+            .setColor(0x00AE86);
+        }
+      }
+
       await interaction.reply({ embeds: [embed] });
     } catch (error) {
       console.error('Error during interaction reply:', error);
-      const errorEmbed = new EmbedBuilder()
+      embed = new EmbedBuilder()
         .setTitle('Error')
         .setDescription('There was an error during the interaction. Please try again later.')
         .setColor(0xFF0000);
-      await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+      await interaction.reply({ embeds: [embed], ephemeral: true });
     }
   },
 };

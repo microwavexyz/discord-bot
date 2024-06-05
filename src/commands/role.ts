@@ -30,18 +30,21 @@ export const command: Command = {
             .setDescription('The role to remove')
             .setRequired(true))),
   async execute(interaction: ChatInputCommandInteraction) {
+    // Ensure the command is used in a guild
     if (!interaction.guild) {
       await sendEmbed(interaction, 0xff0000, 'This command can only be used in a guild.', true);
       return;
     }
 
-    const member = interaction.member as GuildMember | null;
-    if (!member || !member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
+    const member = interaction.member as GuildMember;
+    // Check if the user has permission to manage roles
+    if (!member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
       await sendEmbed(interaction, 0xff0000, 'You do not have permission to use this command.', true);
       return;
     }
 
     const botMember = interaction.guild.members.me;
+    // Check if the bot has permission to manage roles
     if (!botMember || !botMember.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
       await sendEmbed(interaction, 0xff0000, 'I do not have permission to manage roles.', true);
       return;
@@ -51,6 +54,7 @@ export const command: Command = {
     const user = interaction.options.getMember('user') as GuildMember;
     const role = interaction.options.getRole('role') as Role;
 
+    // Validate user and role
     if (!user || !role) {
       await sendEmbed(interaction, 0xff0000, 'User or role not found.', true);
       return;

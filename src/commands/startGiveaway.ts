@@ -58,7 +58,7 @@ export const command: Command = {
       });
     } catch (error) {
       console.error('Error starting giveaway:', error);
-      await interaction.reply({ content: 'There was an error starting the giveaway. Please try again later.', ephemeral: true });
+      await interaction.followUp({ content: 'There was an error starting the giveaway. Please try again later.', ephemeral: true });
     }
   },
 };

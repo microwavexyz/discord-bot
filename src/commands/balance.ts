@@ -14,8 +14,10 @@ export const command: Command = {
 
       const embed = new EmbedBuilder()
         .setColor(0x00ff00)
-        .setTitle('Your Balance')
-        .setDescription(`You have ${balance} points.`);
+        .setTitle(`${interaction.user.tag}'s Balance`)
+        .setDescription(`You have ${balance} points.`)
+        .setThumbnail(interaction.user.displayAvatarURL({ size: 64 }))
+        .setTimestamp();
 
       await interaction.reply({ embeds: [embed] });
     } catch (error) {

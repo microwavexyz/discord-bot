@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction } from 'discord.js';
 import { Command } from '../types/command';
 
 const EMPTY = '⬜';
@@ -43,11 +43,11 @@ export const command: Command = {
 
     await interaction.reply({ embeds: [embed], components: createButtons() });
 
-    const filter = (i: any) => i.user.id === interaction.user.id;
+    const filter = (i: MessageComponentInteraction) => i.user.id === interaction.user.id;
     const collector = interaction.channel?.createMessageComponentCollector({ filter, time: 60000 });
 
-    collector?.on('collect', async (i: any) => {
-      const [_, row, col] = i.customId.split('-');
+    collector?.on('collect', async (i: MessageComponentInteraction) => {
+      const [_, row, col] = i.customId.split('-').map(Number);
       board[row][col] = currentPlayer;
       currentPlayer = currentPlayer === PLAYER_X ? PLAYER_O : PLAYER_X;
 

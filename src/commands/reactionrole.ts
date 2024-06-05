@@ -23,12 +23,7 @@ export const command: Command = {
       return;
     }
 
-    const member = interaction.member as GuildMember | null;
-    if (!member) {
-      await sendEmbed(interaction, 0xff0000, 'Could not retrieve member information.', true);
-      return;
-    }
-
+    const member = interaction.member as GuildMember;
     if (!member.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
       await sendEmbed(interaction, 0xff0000, 'You do not have permission to use this command.', true);
       return;
@@ -40,6 +35,12 @@ export const command: Command = {
 
     if (!isValidEmoji(emoji)) {
       await sendEmbed(interaction, 0xff0000, 'Invalid emoji format. Please provide a valid emoji.', true);
+      return;
+    }
+
+    const botMember = interaction.guild.members.me;
+    if (!botMember?.permissions.has(PermissionsBitField.Flags.AddReactions)) {
+      await sendEmbed(interaction, 0xff0000, 'I do not have permission to add reactions.', true);
       return;
     }
 
@@ -108,6 +109,7 @@ async function handleRoleAssignment(interaction: ChatInputCommandInteraction, ro
       }
     } catch (error) {
       console.error(`Failed to ${action} role ${role.name} for ${user.tag}`, error);
+      await sendEmbed(interaction, 0xff0000, `Failed to ${action} the role for ${user.tag}. Please try again later.`, true);
     }
   }
 }

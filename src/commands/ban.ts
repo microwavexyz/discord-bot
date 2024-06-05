@@ -72,7 +72,12 @@ export const command: Command = {
       await interaction.reply({ content: `${target.tag} has been banned for: ${reason}` });
     } catch (error) {
       console.error('Error banning user:', error);
-      await interaction.reply({ content: 'There was an error banning the user. Please try again later.', ephemeral: true });
+
+      if (error instanceof Error) {
+        await interaction.reply({ content: `Failed to ban user due to error: ${error.message}`, ephemeral: true });
+      } else {
+        await interaction.reply({ content: 'There was an error banning the user. Please try again later.', ephemeral: true });
+      }
     }
   },
 };

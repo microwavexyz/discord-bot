@@ -22,19 +22,19 @@ export const command: Command = {
         )),
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.guild || !interaction.channel || !(interaction.channel instanceof TextChannel)) {
-      await interaction.reply({ content: 'This command can only be used in a text channel.', ephemeral: true });
+      await interaction.reply({ content: 'This command can only be used in a text channel within a guild.', ephemeral: true });
       return;
     }
 
-    const member = interaction.member as GuildMember | null;
-    if (!member || !member.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
+    const member = interaction.member as GuildMember;
+    if (!member.permissions.has(PermissionsBitField.Flags.ManageChannels)) {
       await interaction.reply({ content: 'You do not have permission to manage channels.', ephemeral: true });
       return;
     }
 
     const channel = interaction.channel as TextChannel;
-    const newCategory = interaction.options.getString('category', true);
-    const newCategoryId = categoryIds[newCategory as keyof typeof categoryIds];
+    const newCategory = interaction.options.getString('category', true) as keyof typeof categoryIds;
+    const newCategoryId = categoryIds[newCategory];
 
     if (!newCategoryId) {
       await interaction.reply({ content: 'Invalid category selected.', ephemeral: true });
@@ -49,7 +49,7 @@ export const command: Command = {
 
     try {
       await channel.setParent(categoryChannel.id, { lockPermissions: false });
-      await interaction.reply({ content: `Ticket moved to ${newCategory} category.`, ephemeral: true });
+      await interaction.reply({ content: `Ticket moved to the ${newCategory} priority category.`, ephemeral: true });
     } catch (error) {
       console.error('Error moving ticket:', error);
       await interaction.reply({ content: 'There was an error moving the ticket. Please try again later.', ephemeral: true });

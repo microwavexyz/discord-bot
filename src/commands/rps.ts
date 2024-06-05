@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, MessageComponentInteraction, Interaction } from 'discord.js';
 import { Command } from '../types/command';
 import { updateUserBalance } from '../utils/dataHandler';
 
@@ -38,10 +38,10 @@ export const command: Command = {
     await interaction.reply({ embeds: [embed], components: [row] });
 
     // Create a message collector to handle the button interaction
-    const filter = (i: any) => i.user.id === interaction.user.id;
+    const filter = (i: MessageComponentInteraction) => i.user.id === interaction.user.id;
     const collector = interaction.channel?.createMessageComponentCollector({ filter, time: 15000 });
 
-    collector?.on('collect', async (i: any) => {
+    collector?.on('collect', async (i: MessageComponentInteraction) => {
       const userChoice = i.customId;
       const botChoice = choices[Math.floor(Math.random() * choices.length)];
 
@@ -65,7 +65,7 @@ export const command: Command = {
 
       try {
         if (reward > 0) {
-          updateUserBalance(userId, reward);
+          await updateUserBalance(userId, reward);
         }
 
         const resultEmbed = new EmbedBuilder()
@@ -92,7 +92,7 @@ export const command: Command = {
         interaction.editReply({
           embeds: [new EmbedBuilder().setColor('#ff0000').setTitle('Rock, Paper, Scissors').setDescription('You didn\'t make a move in time!')],
           components: []
-        });
+        }).catch(console.error);
       }
     });
   },

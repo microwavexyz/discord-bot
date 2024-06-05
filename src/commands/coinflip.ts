@@ -20,7 +20,11 @@ export const command: Command = {
         .setTitle('Error')
         .setDescription('There was an error flipping the coin. Please try again later.')
         .setColor(0xFF0000);
-      await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+      if (interaction.deferred || interaction.replied) {
+        await interaction.followUp({ embeds: [errorEmbed], ephemeral: true });
+      } else {
+        await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+      }
     }
   },
 };

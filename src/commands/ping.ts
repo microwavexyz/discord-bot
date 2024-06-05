@@ -7,42 +7,55 @@ export const command: Command = {
     .setName('ping')
     .setDescription('Replies with Pong! and provides bot statistics'),
   async execute(interaction: CommandInteraction) {
-    const client = interaction.client as Client;
+    try {
+      const client = interaction.client as Client;
 
-    // Calculate bot uptime
-    const totalSeconds = (client.uptime ?? 0) / 1000;
-    const days = Math.floor(totalSeconds / 86400);
-    const hours = Math.floor(totalSeconds / 3600) % 24;
-    const minutes = Math.floor(totalSeconds / 60) % 60;
-    const seconds = Math.floor(totalSeconds % 60);
+      // Calculate bot uptime
+      const totalSeconds = (client.uptime ?? 0) / 1000;
+      const days = Math.floor(totalSeconds / 86400);
+      const hours = Math.floor(totalSeconds / 3600) % 24;
+      const minutes = Math.floor(totalSeconds / 60) % 60;
+      const seconds = Math.floor(totalSeconds % 60);
 
-    // Get memory usage
-    const memoryUsage = process.memoryUsage();
-    const memoryUsageMB = (memoryUsage.rss / 1024 / 1024).toFixed(2);
+      // Get memory usage
+      const memoryUsage = process.memoryUsage();
+      const memoryUsageMB = (memoryUsage.rss / 1024 / 1024).toFixed(2);
 
-    // Get server count
-    const serverCount = client.guilds.cache.size;
+      // Get server count
+      const serverCount = client.guilds.cache.size;
 
-    // Get CPU load
-    const cpuLoad = os.loadavg();
+      // Get CPU load
+      const cpuLoad = os.loadavg();
 
-    // Create an embed with the bot statistics
-    const embed = new EmbedBuilder()
-      .setColor('#0099ff')
-      .setTitle('🏓 Pong!')
-      .setDescription('Here are some statistics about the bot:')
-      .addFields(
-        { name: 'Uptime', value: `${days}d ${hours}h ${minutes}m ${seconds}s`, inline: true },
-        { name: 'Memory Usage', value: `${memoryUsageMB} MB`, inline: true },
-        { name: 'Servers', value: `${serverCount}`, inline: true },
-        { name: 'CPU Load (1m)', value: `${cpuLoad[0].toFixed(2)}`, inline: true },
-        { name: 'CPU Load (5m)', value: `${cpuLoad[1].toFixed(2)}`, inline: true },
-        { name: 'CPU Load (15m)', value: `${cpuLoad[2].toFixed(2)}`, inline: true },
-      )
-      .setTimestamp()
-      .setFooter({ text: 'Bot Statistics', iconURL: client.user?.avatarURL() ?? '' });
+      // Create an embed with the bot statistics
+      const embed = new EmbedBuilder()
+        .setColor('#0099ff')
+        .setTitle('🏓 Pong!')
+        .setDescription('Here are some statistics about the bot:')
+        .addFields(
+          { name: 'Uptime', value: `${days}d ${hours}h ${minutes}m ${seconds}s`, inline: true },
+          { name: 'Memory Usage', value: `${memoryUsageMB} MB`, inline: true },
+          { name: 'Servers', value: `${serverCount.toLocaleString()}`, inline: true },
+          { name: 'CPU Load (1m)', value: `${cpuLoad[0].toFixed(2)}`, inline: true },
+          { name: 'CPU Load (5m)', value: `${cpuLoad[1].toFixed(2)}`, inline: true },
+          { name: 'CPU Load (15m)', value: `${cpuLoad[2].toFixed(2)}`, inline: true },
+        )
+        .setTimestamp()
+        .setFooter({ text: 'Bot Statistics', iconURL: client.user?.avatarURL() ?? '' });
 
-    // Send the embed as a reply
-    await interaction.reply({ embeds: [embed] });
+      // Send the embed as a reply
+      await interaction.reply({ embeds: [embed] });
+    } catch (error) {
+      console.error('Error executing ping command:', error);
+
+      // Send error message if something goes wrong
+      const errorEmbed = new EmbedBuilder()
+        .setColor('#FF0000')
+        .setTitle('Error')
+        .setDescription('There was an error while executing the command. Please try again later.')
+        .setTimestamp();
+
+      await interaction.reply({ embeds: [errorEmbed], ephemeral: true });
+    }
   },
 };

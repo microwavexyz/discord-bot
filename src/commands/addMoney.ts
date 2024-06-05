@@ -28,6 +28,11 @@ export const command: Command = {
       return;
     }
 
+    if (amount <= 0) {
+      await interaction.reply({ content: 'The amount must be a positive integer.', ephemeral: true });
+      return;
+    }
+
     try {
       await updateUserBalance(user.id, amount); // Assuming async function
       const newBalance = await getUserBalance(user.id); // Assuming async function
@@ -38,6 +43,9 @@ export const command: Command = {
         .setDescription(`${user.username} has been given ${amount} coins.\nNew balance: ${newBalance} coins`);
 
       await interaction.reply({ embeds: [embed] });
+
+      // Log the transaction
+      console.log(`Admin ${interaction.user.tag} added ${amount} coins to ${user.tag}'s balance. New balance: ${newBalance}`);
     } catch (error) {
       console.error('Error updating balance:', error);
       await interaction.reply({ content: 'There was an error updating the user balance. Please try again later.', ephemeral: true });

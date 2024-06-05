@@ -10,7 +10,7 @@ import {
 } from 'discord.js';
 import { Command } from '../types/command';
 
-const commandsPerPage = 5; // Fewer commands per page for a cleaner look
+const commandsPerPage = 5;
 const commandList = [
   { name: 'addMoney', description: 'Adds money to a user\'s balance.' },
   { name: 'balance', description: 'Shows the balance of a user.' },
@@ -50,7 +50,7 @@ const generateEmbed = (page: number): EmbedBuilder => {
   const commandsToShow = commandList.slice(start, end);
 
   const embed = new EmbedBuilder()
-    .setColor(0x5865F2) // Use Discord's blurple color for consistency
+    .setColor(0x5865F2)
     .setTitle('Help - List of Commands')
     .setDescription('Navigate through the commands using the buttons below.')
     .addFields(
@@ -67,6 +67,11 @@ const generateEmbed = (page: number): EmbedBuilder => {
 export const command: Command = {
   data: new SlashCommandBuilder().setName('help').setDescription('Displays a list of available commands'),
   async execute(interaction: ChatInputCommandInteraction) {
+    if (commandList.length === 0) {
+      await interaction.reply({ content: 'No commands available.', ephemeral: true });
+      return;
+    }
+
     let currentPage = 1;
     const totalPages = Math.ceil(commandList.length / commandsPerPage);
 
@@ -90,7 +95,7 @@ export const command: Command = {
 
     const collector = message.createMessageComponentCollector({
       componentType: ComponentType.Button,
-      time: 60000, // Collector will stop after 60 seconds
+      time: 60000,
     });
 
     collector.on('collect', async (buttonInteraction: MessageComponentInteraction) => {

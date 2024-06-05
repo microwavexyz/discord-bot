@@ -2,6 +2,10 @@ import { SlashCommandBuilder, ChatInputCommandInteraction, EmbedBuilder, Client,
 import { Command } from '../types/command';
 import fs from 'fs';
 import path from 'path';
+import { promisify } from 'util';
+
+const readFile = promisify(fs.readFile);
+const writeFile = promisify(fs.writeFile);
 
 // Define the type for AFK user data
 interface AfkUser {
@@ -18,9 +22,9 @@ if (!fs.existsSync(afkFilePath)) {
 }
 
 // Function to get AFK users
-const getAfkUsers = (): Record<string, AfkUser> => {
+const getAfkUsers = async (): Promise<Record<string, AfkUser>> => {
   try {
-    const afkData = fs.readFileSync(afkFilePath, 'utf8');
+    const afkData = await readFile(afkFilePath, 'utf8');
     return JSON.parse(afkData) as Record<string, AfkUser>;
   } catch (error) {
     console.error('Error reading AFK file:', error);
@@ -29,9 +33,9 @@ const getAfkUsers = (): Record<string, AfkUser> => {
 }
 
 // Function to save AFK users
-const saveAfkUsers = (afkUsers: Record<string, AfkUser>) => {
+const saveAfkUsers = async (afkUsers: Record<string, AfkUser>) => {
   try {
-    fs.writeFileSync(afkFilePath, JSON.stringify(afkUsers, null, 2));
+    await writeFile(afkFilePath, JSON.stringify(afkUsers, null, 2));
   } catch (error) {
     console.error('Error writing to AFK file:', error);
   }
@@ -39,7 +43,7 @@ const saveAfkUsers = (afkUsers: Record<string, AfkUser>) => {
 
 // Function to notify if mentioned user is AFK
 export const notifyIfAfk = async (message: Message) => {
-  const afkUsers = getAfkUsers();
+  const afkUsers = await getAfkUsers();
   const notifiedUsers = new Set<string>();
 
   message.mentions.users.forEach(user => {
@@ -53,7 +57,7 @@ export const notifyIfAfk = async (message: Message) => {
         .addFields({ name: 'Went AFK at', value: afkTimestamp, inline: true })
         .setTimestamp(new Date(afkUser.timestamp));
 
-      message.channel.send({ embeds: [embed] });
+      message.channel.send({ embeds: [embed] }).catch(console.error);
       notifiedUsers.add(user.id);
     }
   });
@@ -81,7 +85,7 @@ export const command: Command = {
         .setName('list')
         .setDescription('Lists all AFK users')),
   async execute(interaction: ChatInputCommandInteraction) {
-    const afkUsers = getAfkUsers();
+    const afkUsers = await getAfkUsers();
 
     if (interaction.options.getSubcommand() === 'set') {
       const afkMessage = interaction.options.getString('message') || 'AFK';
@@ -89,7 +93,7 @@ export const command: Command = {
         message: afkMessage,
         timestamp: Date.now(),
       };
-      saveAfkUsers(afkUsers);
+      await saveAfkUsers(afkUsers);
 
       const embed = new EmbedBuilder()
         .setColor(0x00FF00)
@@ -101,7 +105,7 @@ export const command: Command = {
 
     } else if (interaction.options.getSubcommand() === 'remove') {
       delete afkUsers[interaction.user.id];
-      saveAfkUsers(afkUsers);
+      await saveAfkUsers(afkUsers);
 
       const embed = new EmbedBuilder()
         .setColor(0x00FF00)
@@ -128,10 +132,10 @@ export const command: Command = {
 // Event listener to handle messages and remove AFK status
 export const setupAfkHandler = (client: Client) => {
   client.on('messageCreate', async (message: Message) => {
-    const afkUsers = getAfkUsers();
+    const afkUsers = await getAfkUsers();
     if (afkUsers[message.author.id]) {
       delete afkUsers[message.author.id];
-      saveAfkUsers(afkUsers);
+      await saveAfkUsers(afkUsers);
 
       const embed = new EmbedBuilder()
         .setColor(0x00FF00)

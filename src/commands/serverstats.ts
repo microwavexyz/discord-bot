@@ -16,6 +16,8 @@ export const command: Command = {
     try {
       const textChannels = guild.channels.cache.filter(channel => channel.type === ChannelType.GuildText).size;
       const voiceChannels = guild.channels.cache.filter(channel => channel.type === ChannelType.GuildVoice).size;
+      const categories = guild.channels.cache.filter(channel => channel.type === ChannelType.GuildCategory).size;
+      const boosts = guild.premiumSubscriptionCount || 0;
 
       const embed = new EmbedBuilder()
         .setTitle(`${guild.name} Server Statistics`)
@@ -27,6 +29,8 @@ export const command: Command = {
           { name: 'Roles', value: `${guild.roles.cache.size}`, inline: true },
           { name: 'Text Channels', value: `${textChannels}`, inline: true },
           { name: 'Voice Channels', value: `${voiceChannels}`, inline: true },
+          { name: 'Categories', value: `${categories}`, inline: true },
+          { name: 'Boosts', value: `${boosts}`, inline: true },
           { name: 'Created On', value: guild.createdAt.toLocaleDateString(), inline: true },
         )
         .setColor(0x00AE86);

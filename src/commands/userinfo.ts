@@ -14,7 +14,7 @@ export const command: Command = {
     const member = interaction.guild?.members.cache.get(target.id);
 
     if (!member) {
-      await interaction.reply({ content: 'User not found.', ephemeral: true });
+      await sendEmbed(interaction, 0xff0000, 'User not found.', true);
       return;
     }
 
@@ -35,3 +35,15 @@ export const command: Command = {
     await interaction.reply({ embeds: [embed] });
   },
 };
+
+/**
+ * Sends an embed as a reply to an interaction.
+ * @param interaction The interaction object.
+ * @param color The color of the embed.
+ * @param description The description of the embed.
+ * @param ephemeral Whether the reply should be ephemeral.
+ */
+async function sendEmbed(interaction: ChatInputCommandInteraction, color: number, description: string, ephemeral: boolean = false) {
+  const embed = new EmbedBuilder().setColor(color).setDescription(description);
+  await interaction.reply({ embeds: [embed], ephemeral });
+}

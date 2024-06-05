@@ -30,15 +30,15 @@ export const command: Command = {
     }
 
     try {
-      const senderBalance = getUserBalance(userId);
+      const senderBalance = await getUserBalance(userId);
 
       if (senderBalance < amount) {
         await interaction.reply({ content: 'You do not have enough coins to complete this transfer.', ephemeral: true });
         return;
       }
 
-      updateUserBalance(userId, -amount);
-      updateUserBalance(targetUser.id, amount);
+      await updateUserBalance(userId, -amount);
+      await updateUserBalance(targetUser.id, amount);
 
       const embed = new EmbedBuilder()
         .setColor(0x00ff00)

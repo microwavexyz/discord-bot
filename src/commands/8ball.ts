@@ -1,4 +1,4 @@
-import { SlashCommandBuilder, ChatInputCommandInteraction } from 'discord.js';
+import { SlashCommandBuilder, ChatInputCommandInteraction, Client, CommandInteraction, CacheType } from 'discord.js';
 import { Command } from '../types/command';
 
 const responses = [
@@ -21,8 +21,16 @@ const responses = [
   "My reply is no.",
   "My sources say no.",
   "Outlook not so good.",
-  "Very doubtful."
+  "Very doubtful.",
+  "Absolutely!",
+  "Certainly not.",
+  "It's a mystery.",
+  "Only time will tell.",
+  "Highly unlikely.",
+  "I wouldn't bet on it."
 ];
+
+const cooldowns = new Set<string>();
 
 export const command: Command = {
   data: new SlashCommandBuilder()
@@ -33,8 +41,30 @@ export const command: Command = {
         .setDescription('The question you want to ask')
         .setRequired(true)),
   async execute(interaction: ChatInputCommandInteraction) {
-    const question = interaction.options.getString('question');
-    const response = responses[Math.floor(Math.random() * responses.length)];
-    await interaction.reply(`🎱 ${response}`);
+    const userId = interaction.user.id;
+    if (cooldowns.has(userId)) {
+      await interaction.reply({ content: 'You are using this command too frequently. Please wait a moment before trying again.', ephemeral: true });
+      return;
+    }
+    
+    try {
+      const question = interaction.options.getString('question');
+      if (!question) {
+        await interaction.reply({ content: 'You must ask a question!', ephemeral: true });
+        return;
+      }
+      
+      const response = responses[Math.floor(Math.random() * responses.length)];
+      await interaction.deferReply();
+      await new Promise(resolve => setTimeout(resolve, 1000)); // Adds a small delay for a more realistic response
+      await interaction.editReply(`🎱 You asked: "${question}"\n${response}`);
+      
+      // Add user to cooldown set
+      cooldowns.add(userId);
+      setTimeout(() => cooldowns.delete(userId), 10000); // Cooldown of 10 seconds
+    } catch (error) {
+      console.error('Error executing 8ball command:', error);
+      await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
+    }
   },
 };

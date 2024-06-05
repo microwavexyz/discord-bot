@@ -11,53 +11,47 @@ export const command: Command = {
         .setRequired(true)),
   async execute(interaction: ChatInputCommandInteraction) {
     if (!interaction.guild) {
-      const embed = new EmbedBuilder()
-        .setColor(0xff0000)
-        .setDescription('This command can only be used in a guild.');
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await sendEmbed(interaction, 0xff0000, 'This command can only be used in a guild.', true);
       return;
     }
 
     const member = interaction.member as GuildMember;
     if (!member.permissions.has(PermissionsBitField.Flags.Administrator) && !member.roles.cache.some(role => role.name === 'Moderator')) {
-      const embed = new EmbedBuilder()
-        .setColor(0xff0000)
-        .setDescription('You do not have permission to use this command.');
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await sendEmbed(interaction, 0xff0000, 'You do not have permission to use this command.', true);
       return;
     }
 
     const botMember = interaction.guild.members.me;
     if (!botMember || !botMember.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
-      const embed = new EmbedBuilder()
-        .setColor(0xff0000)
-        .setDescription('I do not have permission to unmute members.');
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await sendEmbed(interaction, 0xff0000, 'I do not have permission to unmute members.', true);
       return;
     }
 
     const user = interaction.options.getMember('user') as GuildMember;
 
     if (!user) {
-      const embed = new EmbedBuilder()
-        .setColor(0xff0000)
-        .setDescription('User not found.');
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await sendEmbed(interaction, 0xff0000, 'User not found.', true);
       return;
     }
 
     try {
       await user.timeout(null); // Remove the timeout to unmute the user
-      const embed = new EmbedBuilder()
-        .setColor(0x00ff00)
-        .setDescription(`Successfully unmuted ${user.user.tag}.`);
-      await interaction.reply({ embeds: [embed] });
+      await sendEmbed(interaction, 0x00ff00, `Successfully unmuted ${user.user.tag}.`);
     } catch (error) {
       console.error('Error unmuting user:', error);
-      const embed = new EmbedBuilder()
-        .setColor(0xff0000)
-        .setDescription('There was an error while unmuting the user. Please try again.');
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      await sendEmbed(interaction, 0xff0000, 'There was an error while unmuting the user. Please try again.', true);
     }
   },
 };
+
+/**
+ * Sends an embed as a reply to an interaction.
+ * @param interaction The interaction object.
+ * @param color The color of the embed.
+ * @param description The description of the embed.
+ * @param ephemeral Whether the reply should be ephemeral.
+ */
+async function sendEmbed(interaction: ChatInputCommandInteraction, color: number, description: string, ephemeral: boolean = false) {
+  const embed = new EmbedBuilder().setColor(color).setDescription(description);
+  await interaction.reply({ embeds: [embed], ephemeral });
+}
