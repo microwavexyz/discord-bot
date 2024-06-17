@@ -7,7 +7,6 @@ dotenv.config();
 
 const config = require('./config.json');
 
-// Anti-Nuke Handlers
 const {
     handleChannelDelete,
     handleRoleDelete,
@@ -23,10 +22,10 @@ const {
     handleWebhookMessage
 } = require('./modules/antiNuke');
 
-// Anti-Spam Handler
 const { handleMessage: handleSpamMessage } = require('./modules/antiSpam');
 
-// Create a new client instance
+const { handleMessage: handleLinkMessage } = require('./modules/antiLink');
+
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -43,45 +42,95 @@ const commandFiles = fs.readdirSync(path.join(__dirname, 'commands')).filter(fil
 
 for (const file of commandFiles) {
     const command = require(`./commands/${file}`);
-    client.commands.set(command.data.name, command);
+    if (command.data && command.data.name && command.execute) {
+        client.commands.set(command.data.name, command);
+    } else {
+        console.error(`Command file ${file} is missing required properties`);
+    }
 }
 
-// Load events
 const eventFiles = fs.readdirSync(path.join(__dirname, 'events')).filter(file => file.endsWith('.js'));
 
 for (const file of eventFiles) {
     const event = require(`./events/${file}`);
-    if (event.once) {
-        client.once(event.name, (...args) => event.execute(...args, client));
+    if (event.name && event.execute) {
+        if (event.once) {
+            client.once(event.name, (...args) => event.execute(...args, client));
+        } else {
+            client.on(event.name, (...args) => event.execute(...args, client));
+        }
     } else {
-        client.on(event.name, (...args) => event.execute(...args, client));
+        console.error(`Event file ${file} is missing required properties`);
     }
 }
 
 // Anti-Nuke Event Handlers
-client.on('channelDelete', handleChannelDelete);
-client.on('roleDelete', handleRoleDelete);
-client.on('guildMemberUpdate', handleGuildMemberUpdate);
-client.on('channelCreate', handleChannelCreate);
-client.on('roleCreate', handleRoleCreate);
-client.on('messageCreate', handleMessageCreate);
-client.on('roleUpdate', handleRoleUpdate);
-client.on('guildMemberAdd', handleGuildMemberAdd);
-client.on('channelUpdate', handleChannelUpdate);
-client.on('webhookUpdate', handleWebhookCreate); // Combined webhook create and delete as webhookUpdate
-client.on('webhookDelete', handleWebhookDelete);
-client.on('webhookUpdate', handleWebhookMessage); // Combined webhook message spam as webhookUpdate
+const antiNukeHandlers = {
+    'channelDelete': handleChannelDelete,
+    'roleDelete': handleRoleDelete,
+    'guildMemberUpdate': handleGuildMemberUpdate,
+    'channelCreate': handleChannelCreate,
+    'roleCreate': handleRoleCreate,
+    'messageCreate': handleMessageCreate,
+    'roleUpdate': handleRoleUpdate,
+    'guildMemberAdd': handleGuildMemberAdd,
+    'channelUpdate': handleChannelUpdate,
+    'webhookUpdate': handleWebhookCreate,
+    'webhookDelete': handleWebhookDelete,
+    'webhookUpdate': handleWebhookMessage,
+};
+
+for (const [event, handler] of Object.entries(antiNukeHandlers)) {
+    if (typeof handler === 'function') {
+        client.on(event, handler);
+    } else {
+        console.error(`Handler for ${event} is not a function`);
+    }
+}
 
 // Anti-Spam Event Handler
-client.on('messageCreate', handleSpamMessage);
+if (typeof handleSpamMessage === 'function') {
+    client.on('messageCreate', handleSpamMessage);
+} else {
+    console.error('Anti-Spam handler is not a function');
+}
+
+// Anti-Link Event Handler
+if (typeof handleLinkMessage === 'function') {
+    client.on('messageCreate', handleLinkMessage);
+} else {
+    console.error('Anti-Link handler is not a function');
+}
 
 // Anti-Ghost Ping Event Handler
 client.on('messageDelete', async (message) => {
-    const messageDelete = require('./events/messageDelete');
-    await messageDelete.execute(message, client);
+    try {
+        const messageDelete = require('./events/messageDelete');
+        if (typeof messageDelete.execute === 'function') {
+            await messageDelete.execute(message, client);
+        } else {
+            console.error('messageDelete handler is not a function');
+        }
+    } catch (error) {
+        console.error('Error loading messageDelete handler:', error);
+    }
 });
 
-// Connect to MongoDB
+client.on('messageCreate', async (message) => {
+  if (message.channel.type === 'DM' && !message.author.bot) {
+      try {
+          const handleDirectMessage = require('./modules/handleDirectMessage');
+          if (typeof handleDirectMessage === 'function') {
+              await handleDirectMessage(message);
+          } else {
+              console.error('Direct message handler is not a function');
+          }
+      } catch (error) {
+          console.error('Error loading direct message handler:', error);
+      }
+  }
+});
+
 mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
@@ -89,13 +138,7 @@ mongoose.connect(process.env.MONGO_URI, {
     console.log('Connected to MongoDB');
 }).catch(err => {
     console.error('MongoDB connection error:', err);
-    process.exit(1); // Exit the process with an error code
+    process.exit(1);
 });
-// Mass DM Event Handler
-client.on('messageCreate', async (message) => {
-  if (message.channel.type === 'DM' && !message.author.bot) {
-      await handleDirectMessage(message);
-  }
-});
-// Login to Discord with your app's token
+
 client.login(config.token);
