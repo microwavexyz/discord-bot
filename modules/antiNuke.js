@@ -6,6 +6,7 @@ const { getNextProxy } = require('./proxyManager');
 const NodeCache = require('node-cache');
 
 const settingsCache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
+const auditLogCache = new NodeCache({ stdTTL: 60, checkperiod: 30 });
 
 const AUDIT_LOG_TYPES = {
     CHANNEL_CREATE: 10,
@@ -18,7 +19,7 @@ const AUDIT_LOG_TYPES = {
     BOT_ADD: 28,
     WEBHOOK_CREATE: 40,
     WEBHOOK_DELETE: 42,
-    MESSAGE_SEND: 23
+    MESSAGE_SEND: 23,
 };
 
 async function fetchWithProxy(url, options) {
@@ -26,7 +27,7 @@ async function fetchWithProxy(url, options) {
     const proxyUrl = new URL(proxy);
     const proxyOptions = {
         ...options,
-        agent: new ProxyAgent(proxyUrl.href)
+        agent: new ProxyAgent(proxyUrl.href),
     };
 
     return fetch(url, proxyOptions);
@@ -80,7 +81,6 @@ async function banMember(guild, userId, reason) {
                 await notifyOwner(guild, member, reason);
             } else {
                 console.error('Missing BAN_MEMBERS permission or botMember is undefined.');
-                console.log('Bot Permissions:', botMember.permissions.toArray());
             }
         } else {
             console.warn(`Could not fetch member with ID ${userId} in guild ${guild.id}`);
@@ -94,9 +94,9 @@ async function handleExcessiveActions(settings, guild, userId, action, limit, re
     try {
         const recentActions = await NukeLog.countDocuments({
             guildId: guild.id,
-            userId: userId,
-            action: action,
-            timestamp: { $gt: Date.now() - settings.timeFrame }
+            userId,
+            action,
+            timestamp: { $gt: Date.now() - settings.timeFrame },
         });
 
         console.log(`Recent actions for user ${userId} in guild ${guild.id}: ${recentActions}`);
@@ -121,12 +121,22 @@ async function fetchSettings(guildId) {
     return settings;
 }
 
+async function fetchAuditLogs(guild, type) {
+    const cacheKey = `${guild.id}-${type}`;
+    let auditLogs = auditLogCache.get(cacheKey);
+    if (!auditLogs) {
+        auditLogs = await guild.fetchAuditLogs({ type, limit: 1 });
+        auditLogCache.set(cacheKey, auditLogs);
+    }
+    return auditLogs;
+}
+
 async function handleChannelCreate(channel) {
     try {
         const settings = await fetchSettings(channel.guild.id);
         if (!settings || !settings.enabled) return;
 
-        const auditLogs = await channel.guild.fetchAuditLogs({ type: AUDIT_LOG_TYPES.CHANNEL_CREATE, limit: 1 });
+        const auditLogs = await fetchAuditLogs(channel.guild, AUDIT_LOG_TYPES.CHANNEL_CREATE);
         const entry = auditLogs.entries.first();
         if (!entry) return;
 
@@ -149,7 +159,7 @@ async function handleChannelUpdate(oldChannel, newChannel) {
         if (!settings || !settings.enabled) return;
 
         if (oldChannel.name !== newChannel.name) {
-            const auditLogs = await newChannel.guild.fetchAuditLogs({ type: AUDIT_LOG_TYPES.CHANNEL_UPDATE, limit: 1 });
+            const auditLogs = await fetchAuditLogs(newChannel.guild, AUDIT_LOG_TYPES.CHANNEL_UPDATE);
             const entry = auditLogs.entries.first();
             if (!entry) return;
 
@@ -170,7 +180,7 @@ async function handleChannelDelete(channel) {
         const settings = await fetchSettings(channel.guild.id);
         if (!settings || !settings.enabled) return;
 
-        const auditLogs = await channel.guild.fetchAuditLogs({ type: AUDIT_LOG_TYPES.CHANNEL_DELETE, limit: 1 });
+        const auditLogs = await fetchAuditLogs(channel.guild, AUDIT_LOG_TYPES.CHANNEL_DELETE);
         const entry = auditLogs.entries.first();
         if (!entry) return;
 
@@ -186,7 +196,7 @@ async function handleRoleCreate(role) {
         const settings = await fetchSettings(role.guild.id);
         if (!settings || !settings.enabled) return;
 
-        const auditLogs = await role.guild.fetchAuditLogs({ type: AUDIT_LOG_TYPES.ROLE_CREATE, limit: 1 });
+        const auditLogs = await fetchAuditLogs(role.guild, AUDIT_LOG_TYPES.ROLE_CREATE);
         const entry = auditLogs.entries.first();
         if (!entry) return;
 
@@ -203,7 +213,7 @@ async function handleRoleUpdate(oldRole, newRole) {
         if (!settings || !settings.enabled) return;
 
         if (oldRole.name !== newRole.name) {
-            const auditLogs = await newRole.guild.fetchAuditLogs({ type: AUDIT_LOG_TYPES.ROLE_UPDATE, limit: 1 });
+            const auditLogs = await fetchAuditLogs(newRole.guild, AUDIT_LOG_TYPES.ROLE_UPDATE);
             const entry = auditLogs.entries.first();
             if (!entry) return;
 
@@ -220,7 +230,7 @@ async function handleRoleDelete(role) {
         const settings = await fetchSettings(role.guild.id);
         if (!settings || !settings.enabled) return;
 
-        const auditLogs = await role.guild.fetchAuditLogs({ type: AUDIT_LOG_TYPES.ROLE_DELETE, limit: 1 });
+        const auditLogs = await fetchAuditLogs(role.guild, AUDIT_LOG_TYPES.ROLE_DELETE);
         const entry = auditLogs.entries.first();
         if (!entry) return;
 
@@ -237,7 +247,7 @@ async function handleGuildMemberUpdate(oldMember, newMember) {
         if (!settings || !settings.enabled) return;
 
         if (oldMember.nickname !== newMember.nickname) {
-            const auditLogs = await newMember.guild.fetchAuditLogs({ type: AUDIT_LOG_TYPES.MEMBER_UPDATE, limit: 1 });
+            const auditLogs = await fetchAuditLogs(newMember.guild, AUDIT_LOG_TYPES.MEMBER_UPDATE);
             const entry = auditLogs.entries.first();
             if (!entry) return;
 
@@ -255,7 +265,7 @@ async function handleGuildMemberAdd(member) {
         if (!settings || !settings.enabled) return;
 
         if (member.user.bot) {
-            const auditLogs = await member.guild.fetchAuditLogs({ type: AUDIT_LOG_TYPES.BOT_ADD, limit: 1 });
+            const auditLogs = await fetchAuditLogs(member.guild, AUDIT_LOG_TYPES.BOT_ADD);
             const entry = auditLogs.entries.first();
             if (!entry) return;
 
@@ -289,7 +299,7 @@ async function handleWebhookCreate(webhook) {
         const settings = await fetchSettings(webhook.guild.id);
         if (!settings || !settings.enabled) return;
 
-        const auditLogs = await webhook.guild.fetchAuditLogs({ type: AUDIT_LOG_TYPES.WEBHOOK_CREATE, limit: 1 });
+        const auditLogs = await fetchAuditLogs(webhook.guild, AUDIT_LOG_TYPES.WEBHOOK_CREATE);
         const entry = auditLogs.entries.first();
         if (!entry) return;
 
@@ -305,7 +315,7 @@ async function handleWebhookDelete(webhook) {
         const settings = await fetchSettings(webhook.guild.id);
         if (!settings || !settings.enabled) return;
 
-        const auditLogs = await webhook.guild.fetchAuditLogs({ type: AUDIT_LOG_TYPES.WEBHOOK_DELETE, limit: 1 });
+        const auditLogs = await fetchAuditLogs(webhook.guild, AUDIT_LOG_TYPES.WEBHOOK_DELETE);
         const entry = auditLogs.entries.first();
         if (!entry) return;
 
@@ -337,7 +347,7 @@ async function handleWebhookMessage(message) {
             webhookMessageCounts.set(webhookId, recentMessages);
 
             if (recentMessages.length >= settings.maxWebhookMessages) {
-                const auditLogs = await message.guild.fetchAuditLogs({ type: AUDIT_LOG_TYPES.MESSAGE_SEND, limit: 1 });
+                const auditLogs = await fetchAuditLogs(message.guild, AUDIT_LOG_TYPES.MESSAGE_SEND);
                 const entry = auditLogs.entries.first();
                 if (entry && entry.target.id === webhookId) {
                     await logNukeAction(entry.executor.id, message.guild.id, 'WEBHOOK_MESSAGE_SPAM');
@@ -364,10 +374,10 @@ async function handleDirectMessage(message) {
         const timestamps = dmMessageCounts.get(userId);
         timestamps.push(now);
 
-        const recentMessages = timestamps.filter(timestamp => now - timestamp < 60000); 
+        const recentMessages = timestamps.filter(timestamp => now - timestamp < 60000);
         dmMessageCounts.set(userId, recentMessages);
 
-        if (recentMessages.length >= 10) { 
+        if (recentMessages.length >= 10) {
             await banMember(message.guild, userId, 'Excessive DMs');
         }
     } catch (error) {
@@ -388,5 +398,5 @@ module.exports = {
     handleWebhookCreate,
     handleWebhookDelete,
     handleWebhookMessage,
-    handleDirectMessage
+    handleDirectMessage,
 };
