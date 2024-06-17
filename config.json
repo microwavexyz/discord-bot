@@ -1,0 +1,9 @@
+{
+  "token": "MTIxMTg4ODE5ODE0NjMzMDYyNA.GocsTp.5Do5bO2j3C0UYZQOYvnZ_eyOrJ4sdudgSZ2r8k",
+  "clientId": "1211888198146330624",
+  "guildId": "1252075815768690790",
+  "mongoUri": "YOUR_MONGO_URI",
+  "proxies": [
+    "http://217.28.128.31:44444:14a97aa1b3022:ca973b97fc"
+  ]
+}

@@ -1,0 +1,74 @@
+[
+  {
+    "caseNumber": 1,
+    "user": "samet.exe",
+    "moderator": "samet.exe",
+    "command": "warn",
+    "timestamp": "2024-06-17T08:28:09.997Z",
+    "reason": "nigger"
+  },
+  {
+    "caseNumber": 2,
+    "user": "samet.exe",
+    "moderator": "microwave.xyz",
+    "command": "warn",
+    "timestamp": "2024-06-17T08:29:37.292Z",
+    "reason": "1"
+  },
+  {
+    "caseNumber": 3,
+    "user": "samet.exe",
+    "moderator": "microwave.xyz",
+    "command": "ban",
+    "timestamp": "2024-06-17T10:10:35.127Z",
+    "reason": "No reason provided"
+  },
+  {
+    "caseNumber": 4,
+    "user": "notdotxyz",
+    "moderator": "microwave.xyz",
+    "command": "unmute",
+    "timestamp": "2024-06-17T10:35:17.422Z",
+    "reason": "No reason provided"
+  },
+  {
+    "caseNumber": 5,
+    "user": "notdotxyz",
+    "moderator": "microwave.xyz",
+    "command": "unmute",
+    "timestamp": "2024-06-17T10:36:04.952Z",
+    "reason": "No reason provided"
+  },
+  {
+    "caseNumber": 6,
+    "user": "notdotxyz",
+    "moderator": "microwave.xyz",
+    "command": "unban",
+    "timestamp": "2024-06-17T10:42:18.810Z",
+    "reason": "No reason provided"
+  },
+  {
+    "caseNumber": 7,
+    "user": "notdotxyz",
+    "moderator": "microwave.xyz",
+    "command": "unban",
+    "timestamp": "2024-06-17T11:16:12.636Z",
+    "reason": "No reason provided"
+  },
+  {
+    "caseNumber": 8,
+    "user": "notdotxyz",
+    "moderator": "microwave.xyz",
+    "command": "unban",
+    "timestamp": "2024-06-17T11:45:59.683Z",
+    "reason": "No reason provided"
+  },
+  {
+    "caseNumber": 9,
+    "user": "notdotxyz",
+    "moderator": "microwave.xyz",
+    "command": "unban",
+    "timestamp": "2024-06-17T11:51:42.123Z",
+    "reason": "No reason provided"
+  }
+]
