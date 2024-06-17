@@ -1,54 +1,98 @@
-const fs = require('fs');
-const path = require('path');
-
-const filePath = path.join(__dirname, '../data/moderationCases.json');
+const { MongoClient } = require('mongodb');
+const uri = process.env.MONGO_URI || 'mongodb://localhost:27017';
+const dbName = 'moderation';
+const collectionName = 'cases';
 
 class CaseManager {
   constructor() {
-    try {
-      if (fs.existsSync(filePath)) {
-        const data = fs.readFileSync(filePath, 'utf-8');
-        this.cases = JSON.parse(data);
-        if (!Array.isArray(this.cases)) {
-          console.error('Data loaded is not an array, initializing as empty array.');
-          this.cases = [];
-        }
-      } else {
-        console.log('File does not exist, initializing as empty array.');
-        this.cases = [];
-      }
-    } catch (error) {
-      console.error('Error reading or parsing file:', error);
-      this.cases = [];
-    }
+    this.client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });
+    this.client.connect()
+      .then(() => {
+        console.log('Connected to MongoDB');
+        this.db = this.client.db(dbName);
+        this.casesCollection = this.db.collection(collectionName);
+        this.warningsCollection = this.db.collection('warnings');
+      })
+      .catch(err => {
+        console.error('Error connecting to MongoDB:', err);
+      });
   }
 
-  saveCases() {
-    try {
-      fs.writeFileSync(filePath, JSON.stringify(this.cases, null, 2), 'utf-8');
-      console.log('Cases saved successfully.');
-    } catch (error) {
-      console.error('Error saving cases:', error);
-    }
+  async saveCases() {
   }
 
-  createCase(user, moderator, command, reason) {
-    const caseNumber = this.cases.length + 1;
+  async createCase(user, moderator, command, reason) {
     const newCase = {
-      caseNumber,
       user,
       moderator,
       command,
       timestamp: new Date().toISOString(),
       reason,
     };
-    this.cases.push(newCase);
-    this.saveCases();
-    return caseNumber;
+    try {
+      const result = await this.casesCollection.insertOne(newCase);
+      console.log('Case created successfully:', result.insertedId);
+      return result.insertedId;
+    } catch (error) {
+      console.error('Error creating case:', error);
+      throw error;
+    }
   }
 
-  getCases() {
-    return this.cases;
+  async getCasesByUser(user) {
+    try {
+      const cases = await this.casesCollection.find({ user }).toArray();
+      return cases;
+    } catch (error) {
+      console.error('Error retrieving cases for user:', error);
+      throw error;
+    }
+  }
+
+  async getAllCases() {
+    try {
+      const cases = await this.casesCollection.find().toArray();
+      return cases;
+    } catch (error) {
+      console.error('Error retrieving all cases:', error);
+      throw error;
+    }
+  }
+
+  async addWarning(userId, reason) {
+    const warning = {
+      userId,
+      reason,
+      date: new Date().toISOString(),
+    };
+    try {
+      const result = await this.warningsCollection.insertOne(warning);
+      console.log('Warning added successfully:', result.insertedId);
+      return result.insertedId;
+    } catch (error) {
+      console.error('Error adding warning:', error);
+      throw error;
+    }
+  }
+
+  async clearWarnings(userId) {
+    try {
+      const result = await this.warningsCollection.deleteMany({ userId });
+      return result;
+    } catch (error) {
+      console.error('Error clearing warnings:', error);
+      throw error;
+    }
+  }
+
+  async getWarnings(userId) {
+    try {
+      const warnings = await this.warningsCollection.find({ userId }).toArray();
+      return warnings;
+    } catch (error) {
+      console.error('Error retrieving warnings:', error);
+      throw error;
+    }
   }
 }
 
