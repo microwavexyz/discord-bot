@@ -120,8 +120,10 @@ module.exports = {
         .setColor(0x00FF00)
         .setTitle('User Timed Out')
         .setDescription(`Timed out ${user.tag} for ${durationInput} for: ${reason}`)
-        .addField('Case Number', `${caseNumber}`, true)
-        .addField('Moderator', `${moderator}`, true)
+        .addFields(
+          { name: 'Case Number', value: `${caseNumber}`, inline: true },
+          { name: 'Moderator', value: `${moderator}`, inline: true }
+        )
         .setTimestamp();
 
       await interaction.reply({ embeds: [embed], ephemeral: false });
