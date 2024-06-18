@@ -1,4 +1,6 @@
-const { MessageEmbed } = require('discord.js');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
+const { ModalSubmitInteraction } = require('discord-modals');
+require('dotenv').config();
 
 module.exports = {
     name: 'interactionCreate',
@@ -14,64 +16,124 @@ module.exports = {
                 await interaction.reply({ content: 'There was an error while executing this command!', ephemeral: true });
             }
         } else if (interaction.isModalSubmit()) {
-            let embed;
+            try {
+                let embed;
+                let applicationChannelID = process.env.APPLICATION_CHANNEL_ID;
+                let acceptedChannelID = process.env.ACCEPTED_CHANNEL_ID;
 
-            if (interaction.customId === 'apply_global_moderator') {
-                embed = new MessageEmbed()
-                    .setTitle('Global Moderator Application')
-                    .setDescription('A new Global Moderator application has been submitted')
-                    .setColor('BLUE')
-                    .setTimestamp()
-                    .addFields(
-                        { name: "Name", value: interaction.fields.getTextInputValue('name') },
-                        { name: "Age", value: interaction.fields.getTextInputValue('age') },
-                        { name: "Discord & Server Time", value: interaction.fields.getTextInputValue('discord_time') },
-                        { name: "In-Game Name", value: interaction.fields.getTextInputValue('in_game_name') },
-                        { name: "Timezone", value: interaction.fields.getTextInputValue('timezone') },
-                        { name: "Problem Solution", value: interaction.fields.getTextInputValue('problem_solution') }
-                    )
-                    .setFooter(`UserID: ${interaction.user.id}`);
-            } else if (interaction.customId === 'apply_global_admin') {
-                embed = new MessageEmbed()
-                    .setTitle('Global Admin Application')
-                    .setDescription('A new Global Admin application has been submitted')
-                    .setColor('BLUE')
-                    .setTimestamp()
-                    .addFields(
-                        { name: "Name", value: interaction.fields.getTextInputValue('name') },
-                        { name: "Age", value: interaction.fields.getTextInputValue('age') },
-                        { name: "Moderator Time", value: interaction.fields.getTextInputValue('moderator_time') },
-                        { name: "In-Game Name", value: interaction.fields.getTextInputValue('in_game_name') },
-                        { name: "Timezone", value: interaction.fields.getTextInputValue('timezone') },
-                        { name: "Issues Handling", value: interaction.fields.getTextInputValue('admin_issues_handling') },
-                        { name: "Admin Responsibilities", value: interaction.fields.getTextInputValue('admin_responsibilities') },
-                        { name: "Understanding Responsibilities", value: interaction.fields.getTextInputValue('admin_understanding') }
-                    )
-                    .setFooter(`UserID: ${interaction.user.id}`);
-            } else if (interaction.customId === 'apply_minecraft_staff') {
-                embed = new MessageEmbed()
-                    .setTitle('Minecraft Server Staff Application')
-                    .setDescription('A new Minecraft Server Staff application has been submitted')
-                    .setColor('BLUE')
-                    .setTimestamp()
-                    .addFields(
-                        { name: "Server Name", value: interaction.fields.getTextInputValue('server_name') },
-                        { name: "Server Time", value: interaction.fields.getTextInputValue('server_time') },
-                        { name: "Previous Experience", value: interaction.fields.getTextInputValue('previous_experience') },
-                        { name: "Abuse Consequences", value: interaction.fields.getTextInputValue('abuse_consequences') },
-                        { name: "Cheat Reaction", value: interaction.fields.getTextInputValue('cheat_reaction') },
-                        { name: "Age", value: interaction.fields.getTextInputValue('age') },
-                        { name: "In-Game Name", value: interaction.fields.getTextInputValue('in_game_name') },
-                        { name: "Timezone", value: interaction.fields.getTextInputValue('timezone') }
-                    )
-                    .setFooter(`UserID: ${interaction.user.id}`);
-            }
+                // Create the application channel if it doesn't exist
+                let applicationChannel = interaction.guild.channels.cache.get(applicationChannelID);
+                if (!applicationChannel) {
+                    applicationChannel = await interaction.guild.channels.create('applications', {
+                        type: 'text',
+                        permissionOverwrites: [
+                            {
+                                id: interaction.guild.id,
+                                deny: ['ViewChannel'],
+                            },
+                        ],
+                    });
+                    applicationChannelID = applicationChannel.id;
+                }
 
-            const channel = interaction.guild.channels.cache.get(process.env.SUBMIT_CHANNEL_ID);
-            if (channel && channel.isText()) {
-                await channel.send({ embeds: [embed] });
+                // Create the accepted applications channel if it doesn't exist
+                let acceptedChannel = interaction.guild.channels.cache.get(acceptedChannelID);
+                if (!acceptedChannel) {
+                    acceptedChannel = await interaction.guild.channels.create('accepted-applications', {
+                        type: 'text',
+                        permissionOverwrites: [
+                            {
+                                id: interaction.guild.id,
+                                deny: ['ViewChannel'],
+                            },
+                        ],
+                    });
+                    acceptedChannelID = acceptedChannel.id;
+                }
+
+                switch (interaction.customId) {
+                    case 'apply_global_moderator':
+                        embed = new EmbedBuilder()
+                            .setTitle('Global Moderator Application')
+                            .setDescription('A new Global Moderator application has been submitted')
+                            .setColor('Blue')
+                            .setTimestamp()
+                            .addFields(
+                                { name: 'Time in discord & server', value: interaction.fields.getTextInputValue('discord_time') },
+                                { name: 'Age', value: interaction.fields.getTextInputValue('age') },
+                                { name: 'In-Game Name', value: interaction.fields.getTextInputValue('in_game_name') },
+                                { name: 'Timezone', value: interaction.fields.getTextInputValue('timezone') },
+                                { name: 'Example of problem-solving', value: interaction.fields.getTextInputValue('problem_solution') }
+                            )
+                            .setFooter({ text: `UserID: ${interaction.user.id}` });
+                        break;
+
+                    case 'apply_global_admin':
+                        embed = new EmbedBuilder()
+                            .setTitle('Global Admin Application')
+                            .setDescription('A new Global Admin application has been submitted')
+                            .setColor('Blue')
+                            .setTimestamp()
+                            .addFields(
+                                { name: 'Time as Moderator', value: interaction.fields.getTextInputValue('moderator_time') },
+                                { name: 'Examples of handling issues', value: interaction.fields.getTextInputValue('admin_issues_handling') },
+                                { name: 'Understand Admin responsibilities', value: interaction.fields.getTextInputValue('admin_understanding') },
+                                { name: 'Summary of Admin responsibilities', value: interaction.fields.getTextInputValue('admin_responsibilities') },
+                                { name: 'In-Game Name', value: interaction.fields.getTextInputValue('in_game_name') }
+                            )
+                            .setFooter({ text: `UserID: ${interaction.user.id}` });
+                        break;
+
+                    case 'apply_minecraft_staff':
+                        embed = new EmbedBuilder()
+                            .setTitle('Minecraft Server Staff Application')
+                            .setDescription('A new Minecraft Server Staff application has been submitted')
+                            .setColor('Blue')
+                            .setTimestamp()
+                            .addFields(
+                                { name: 'Server you are applying for', value: interaction.fields.getTextInputValue('server_name') },
+                                { name: 'Previous staff experience', value: interaction.fields.getTextInputValue('previous_experience') },
+                                { name: 'Understand abuse consequences', value: interaction.fields.getTextInputValue('abuse_consequences') },
+                                { name: 'How to react to cheating', value: interaction.fields.getTextInputValue('cheat_reaction') },
+                                { name: 'Age, IGN, Timezone', value: interaction.fields.getTextInputValue('age') }
+                            )
+                            .setFooter({ text: `UserID: ${interaction.user.id}` });
+                        break;
+
+                    default:
+                        return;
+                }
+
+                const buttons = new ActionRowBuilder()
+                    .addComponents(
+                        new ButtonBuilder()
+                            .setCustomId('accept')
+                            .setLabel('Accept')
+                            .setStyle(ButtonStyle.Success),
+                        new ButtonBuilder()
+                            .setCustomId('deny')
+                            .setLabel('Deny')
+                            .setStyle(ButtonStyle.Danger)
+                    );
+
+                const sentMessage = await applicationChannel.send({ embeds: [embed], components: [buttons] });
+
+                const collector = sentMessage.createMessageComponentCollector({ componentType: 2, time: 86400000 });
+
+                collector.on('collect', async i => {
+                    if (i.customId === 'accept') {
+                        await acceptedChannel.send({ embeds: [embed] });
+                        await i.update({ content: 'Application accepted!', components: [] });
+                    } else if (i.customId === 'deny') {
+                        await i.update({ content: 'Application denied!', components: [] });
+                    }
+                });
+
+                await interaction.reply({ content: 'Your application has been submitted successfully.', ephemeral: true });
+            } catch (error) {
+                console.error('Error handling modal submit interaction:', error);
+                await interaction.reply({ content: 'There was an error while submitting your application. Please try again later.', ephemeral: true });
             }
-            await interaction.reply({ content: 'Your application has been submitted successfully.', ephemeral: true });
         }
     }
 };
