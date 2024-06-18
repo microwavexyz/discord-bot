@@ -1,6 +1,5 @@
-const { SlashCommandBuilder, CommandInteraction, Collection } = require('discord.js');
-
-const afkUsers = new Collection();
+const { SlashCommandBuilder } = require('@discordjs/builders');
+const AfkUser = require('../models/AfkUser');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -9,8 +8,18 @@ module.exports = {
     .addStringOption(option => option.setName('message').setDescription('AFK message').setRequired(true)),
   async execute(interaction) {
     const message = interaction.options.getString('message', true);
-    afkUsers.set(interaction.user.id, message);
 
-    await interaction.reply({ content: `You are now AFK: ${message}`, ephemeral: true });
+    try {
+      await AfkUser.findOneAndUpdate(
+        { userId: interaction.user.id },
+        { message, timestamp: new Date() },
+        { upsert: true, new: true }
+      );
+
+      await interaction.reply({ content: `You are now AFK: ${message}`, ephemeral: true });
+    } catch (error) {
+      console.error('Error setting AFK status:', error);
+      await interaction.reply({ content: 'There was an error setting your AFK status.', ephemeral: true });
+    }
   },
 };

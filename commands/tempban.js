@@ -24,6 +24,15 @@ module.exports = {
     const reason = options.getString('reason') || 'No reason provided';
     const moderator = interaction.user.tag;
 
+    if (target.id === interaction.user.id || target.id === interaction.client.user.id) {
+      const embed = new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setTitle('Invalid Target')
+        .setDescription('You cannot ban yourself or the bot.');
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+      return;
+    }
+
     const member = await interaction.guild?.members.fetch(target.id).catch(() => null);
 
     if (!member) {

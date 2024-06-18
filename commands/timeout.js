@@ -15,6 +15,15 @@ module.exports = {
     const reason = options.getString('reason') || 'No reason provided';
     const moderator = interaction.user.tag;
 
+    if (user.id === interaction.user.id || user.id === interaction.client.user.id) {
+      const embed = new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setTitle('Invalid Target')
+        .setDescription('You cannot timeout yourself or the bot.');
+      await interaction.reply({ embeds: [embed], ephemeral: true });
+      return;
+    }
+
     if (!interaction.guild?.members.me?.permissions.has(PermissionsBitField.Flags.ModerateMembers)) {
       const embed = new EmbedBuilder()
         .setColor(0xFF0000)
