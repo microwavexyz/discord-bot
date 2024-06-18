@@ -1,9 +1,9 @@
 const mongoose = require('mongoose');
 
-const AntiSpamSettingsSchema = new mongoose.Schema({
+const antiSpamSettingsSchema = new mongoose.Schema({
     guildId: { type: String, required: true, unique: true },
-    threshold: { type: Number, default: 5 },
-    timeFrame: { type: Number, default: 10000 }
+    timeFrame: { type: Number, required: true, default: 10000 }, // Time frame in milliseconds
+    threshold: { type: Number, required: true, default: 5 }, // Number of messages in the time frame
 });
 
-module.exports = mongoose.model('AntiSpamSettings', AntiSpamSettingsSchema);
+module.exports = mongoose.model('AntiSpamSettings', antiSpamSettingsSchema);
