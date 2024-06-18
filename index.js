@@ -7,7 +7,6 @@ dotenv.config();
 
 const config = require('./config.json');
 
-
 const {
     handleChannelDelete,
     handleRoleDelete,
@@ -18,16 +17,13 @@ const {
     handleRoleUpdate,
     handleGuildMemberAdd,
     handleChannelUpdate,
-    handleWebhookCreate,
-    handleWebhookDelete,
-    handleWebhookMessage
+    handleWebhookMessage,
+    handleDirectMessage,
+    restoreState,
 } = require('./modules/antiNuke');
 
-
 const { handleMessage: handleSpamMessage } = require('./modules/antiSpam');
-
 const { handleMessage: handleLinkMessage } = require('./modules/antiLink');
-
 
 const client = new Client({
     intents: [
@@ -35,14 +31,13 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.DirectMessages
-    ]
+        GatewayIntentBits.DirectMessages,
+    ],
 });
+
 client.commands = new Collection();
 
-
 const commandFiles = fs.readdirSync(path.join(__dirname, 'commands')).filter(file => file.endsWith('.js'));
-
 for (const file of commandFiles) {
     const command = require(`./commands/${file}`);
     if (command.data && command.data.name && command.execute) {
@@ -52,9 +47,7 @@ for (const file of commandFiles) {
     }
 }
 
-
 const eventFiles = fs.readdirSync(path.join(__dirname, 'events')).filter(file => file.endsWith('.js'));
-
 for (const file of eventFiles) {
     const event = require(`./events/${file}`);
     if (event.name && event.execute) {
@@ -68,25 +61,29 @@ for (const file of eventFiles) {
     }
 }
 
-
 const antiNukeHandlers = {
-    'channelDelete': handleChannelDelete,
-    'roleDelete': handleRoleDelete,
-    'guildMemberUpdate': handleGuildMemberUpdate,
-    'channelCreate': handleChannelCreate,
-    'roleCreate': handleRoleCreate,
-    'messageCreate': handleMessageCreate,
-    'roleUpdate': handleRoleUpdate,
-    'guildMemberAdd': handleGuildMemberAdd,
-    'channelUpdate': handleChannelUpdate,
-    'webhookUpdate': handleWebhookCreate,
-    'webhookDelete': handleWebhookDelete,
-    'webhookUpdate': handleWebhookMessage,
+    channelDelete: handleChannelDelete,
+    roleDelete: handleRoleDelete,
+    guildMemberUpdate: handleGuildMemberUpdate,
+    channelCreate: handleChannelCreate,
+    roleCreate: handleRoleCreate,
+    messageCreate: handleMessageCreate,
+    roleUpdate: handleRoleUpdate,
+    guildMemberAdd: handleGuildMemberAdd,
+    channelUpdate: handleChannelUpdate,
+    webhookMessage: handleWebhookMessage,
 };
 
 for (const [event, handler] of Object.entries(antiNukeHandlers)) {
     if (typeof handler === 'function') {
-        client.on(event, handler);
+        client.on(event, async (...args) => {
+            console.log(`Anti-Nuke handler triggered for event: ${event}`);
+            try {
+                await handler(...args, client);
+            } catch (error) {
+                console.error(`Error handling ${event}:`, error);
+            }
+        });
     } else {
         console.error(`Handler for ${event} is not a function`);
     }
@@ -98,13 +95,11 @@ if (typeof handleSpamMessage === 'function') {
     console.error('Anti-Spam handler is not a function');
 }
 
-
 if (typeof handleLinkMessage === 'function') {
     client.on('messageCreate', handleLinkMessage);
 } else {
     console.error('Anti-Link handler is not a function');
 }
-
 
 client.on('messageDelete', async (message) => {
     try {
@@ -120,20 +115,23 @@ client.on('messageDelete', async (message) => {
 });
 
 client.on('messageCreate', async (message) => {
-  if (message.channel.type === 'DM' && !message.author.bot) {
-      try {
-          const handleDirectMessage = require('./modules/handleDirectMessage');
-          if (typeof handleDirectMessage === 'function') {
-              await handleDirectMessage(message);
-          } else {
-              console.error('Direct message handler is not a function');
-          }
-      } catch (error) {
-          console.error('Error loading direct message handler:', error);
-      }
-  }
-});
+    if (message.channel.type === 'DM' && !message.author.bot) {
+        try {
+            await handleDirectMessage(message);
+        } catch (error) {
+            console.error('Error handling direct message:', error);
+        }
+    }
 
+    // Handle webhook messages
+    if (message.webhookId) {
+        try {
+            await handleWebhookMessage(message);
+        } catch (error) {
+            console.error('Error handling webhook message:', error);
+        }
+    }
+});
 
 mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
@@ -146,4 +144,3 @@ mongoose.connect(process.env.MONGO_URI, {
 });
 
 client.login(config.token);
-
