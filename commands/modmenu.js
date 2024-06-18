@@ -80,63 +80,69 @@ module.exports = {
             await i.showModal(modal);
 
             const modalFilter = interaction => interaction.customId === `${i.customId}Modal` && interaction.user.id === i.user.id;
-            const modalInteraction = await i.awaitModalSubmit({ filter: modalFilter, time: 15000 });
 
-            if (modalInteraction) {
-                const userId = modalInteraction.fields.getTextInputValue('userId');
-                const reason = modalInteraction.fields.getTextInputValue('reason');
-                const duration = modalInteraction.fields.getTextInputValue('duration');
+            try {
+                const modalInteraction = await i.awaitModalSubmit({ filter: modalFilter, time: 15000 });
 
-                let responseMessage = `Action: ${i.customId}\nUser ID: ${userId}\nReason: ${reason}`;
+                if (modalInteraction) {
+                    const userId = modalInteraction.fields.getTextInputValue('userId');
+                    const reason = modalInteraction.fields.getTextInputValue('reason');
 
-                if (i.customId === 'timeout' && duration) {
-                    responseMessage += `\nDuration: ${duration} minutes`;
-                }
+                    let responseMessage = `Action: ${i.customId}\nUser ID: ${userId}\nReason: ${reason}`;
 
-                try {
-                    const member = await interaction.guild.members.fetch(userId);
+                    try {
+                        const member = await interaction.guild.members.fetch(userId);
 
-                    switch (i.customId) {
-                        case 'ban':
-                            await member.ban({ reason });
-                            responseMessage = `User ${member.user.tag} has been banned.\n${responseMessage}`;
-                            break;
-                        case 'kick':
-                            await member.kick(reason);
-                            responseMessage = `User ${member.user.tag} has been kicked.\n${responseMessage}`;
-                            break;
-                        case 'warn':
-                            // Existing warn logic
-                            let warnings = {};
-                            if (fs.existsSync(warningsFile)) {
-                                warnings = JSON.parse(fs.readFileSync(warningsFile, 'utf-8'));
-                            }
+                        switch (i.customId) {
+                            case 'ban':
+                                await member.ban({ reason });
+                                responseMessage = `User ${member.user.tag} has been banned.\n${responseMessage}`;
+                                break;
+                            case 'kick':
+                                await member.kick(reason);
+                                responseMessage = `User ${member.user.tag} has been kicked.\n${responseMessage}`;
+                                break;
+                            case 'warn':
+                                // Existing warn logic
+                                let warnings = {};
+                                if (fs.existsSync(warningsFile)) {
+                                    warnings = JSON.parse(fs.readFileSync(warningsFile, 'utf-8'));
+                                }
 
-                            if (!warnings[userId]) {
-                                warnings[userId] = [];
-                            }
+                                if (!warnings[userId]) {
+                                    warnings[userId] = [];
+                                }
 
-                            warnings[userId].push({ reason, date: new Date().toISOString() });
+                                warnings[userId].push({ reason, date: new Date().toISOString() });
 
-                            fs.writeFileSync(warningsFile, JSON.stringify(warnings, null, 2));
+                                fs.writeFileSync(warningsFile, JSON.stringify(warnings, null, 2));
 
-                            const caseNumber = caseManager.createCase(member.user.tag, interaction.user.tag, 'warn', reason);
-                            responseMessage = `User ${member.user.tag} has been warned.\n${responseMessage}\nCase #${caseNumber}`;
-                            break;
-                        case 'timeout':
-                            if (duration) {
-                                await member.timeout(duration * 60 * 1000, reason);
-                                responseMessage = `User ${member.user.tag} has been timed out for ${duration} minutes.\n${responseMessage}`;
-                            } else {
-                                responseMessage = `No duration provided for timeout.\n${responseMessage}`;
-                            }
-                            break;
+                                const caseNumber = caseManager.createCase(member.user.tag, interaction.user.tag, 'warn', reason);
+                                responseMessage = `User ${member.user.tag} has been warned.\n${responseMessage}\nCase #${caseNumber}`;
+                                break;
+                            case 'timeout':
+                                const duration = modalInteraction.fields.getTextInputValue('duration');
+                                if (duration) {
+                                    await member.timeout(duration * 60 * 1000, reason);
+                                    responseMessage = `User ${member.user.tag} has been timed out for ${duration} minutes.\n${responseMessage}`;
+                                } else {
+                                    responseMessage = `No duration provided for timeout.\n${responseMessage}`;
+                                }
+                                break;
+                        }
+                    } catch (error) {
+                        responseMessage = `Failed to perform action. Error: ${error.message}\n${responseMessage}`;
                     }
-                } catch (error) {
-                    responseMessage = `Failed to perform action. Error: ${error.message}\n${responseMessage}`;
-                }
 
-                await modalInteraction.reply({ content: responseMessage, ephemeral: true });
+                    await modalInteraction.reply({ content: responseMessage, ephemeral: true });
+                }
+            } catch (error) {
+                if (error.code === 'InteractionCollectorError') {
+                    await i.reply({ content: 'Modal submission timed out. Please try again.', ephemeral: true });
+                } else {
+                    console.error('Error in modal submission:', error);
+                    await i.reply({ content: 'An error occurred during modal submission. Please try again later.', ephemeral: true });
+                }
             }
         });
 
