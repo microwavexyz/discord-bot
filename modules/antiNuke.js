@@ -128,9 +128,9 @@ async function fetchAuditLogs(guild, type) {
     let auditLogs = auditLogCache.get(cacheKey);
     if (!auditLogs) {
         auditLogs = await guild.fetchAuditLogs({ type, limit: 1 });
-        auditLogCache.set(cacheKey, auditLogs);
+        auditLogCache.set(cacheKey, auditLogs.entries);
     }
-    return auditLogs;
+    return auditLogCache.get(cacheKey);
 }
 
 async function saveStateBeforeNuke(channel, stateType) {
@@ -211,7 +211,7 @@ async function handleChannelCreate(channel) {
         if (!settings || !settings.enabled) return;
 
         const auditLogs = await fetchAuditLogs(channel.guild, AUDIT_LOG_TYPES.CHANNEL_CREATE);
-        const entry = auditLogs.entries.first();
+        const entry = auditLogs.first();
         if (!entry) return;
 
         await logNukeAction(entry.executor.id, channel.guild.id, 'CHANNEL_CREATE');
@@ -235,7 +235,7 @@ async function handleChannelUpdate(oldChannel, newChannel) {
 
         if (oldChannel.name !== newChannel.name) {
             const auditLogs = await fetchAuditLogs(newChannel.guild, AUDIT_LOG_TYPES.CHANNEL_UPDATE);
-            const entry = auditLogs.entries.first();
+            const entry = auditLogs.first();
             if (!entry) return;
 
             await logNukeAction(entry.executor.id, newChannel.guild.id, 'CHANNEL_UPDATE');
@@ -257,7 +257,7 @@ async function handleChannelDelete(channel) {
         if (!settings || !settings.enabled) return;
 
         const auditLogs = await fetchAuditLogs(channel.guild, AUDIT_LOG_TYPES.CHANNEL_DELETE);
-        const entry = auditLogs.entries.first();
+        const entry = auditLogs.first();
         if (!entry) return;
 
         await logNukeAction(entry.executor.id, channel.guild.id, 'CHANNEL_DELETE');
@@ -274,7 +274,7 @@ async function handleRoleCreate(role) {
         if (!settings || !settings.enabled) return;
 
         const auditLogs = await fetchAuditLogs(role.guild, AUDIT_LOG_TYPES.ROLE_CREATE);
-        const entry = auditLogs.entries.first();
+        const entry = auditLogs.first();
         if (!entry) return;
 
         await logNukeAction(entry.executor.id, role.guild.id, 'ROLE_CREATE');
@@ -292,7 +292,7 @@ async function handleRoleUpdate(oldRole, newRole) {
 
         if (oldRole.name !== newRole.name) {
             const auditLogs = await fetchAuditLogs(newRole.guild, AUDIT_LOG_TYPES.ROLE_UPDATE);
-            const entry = auditLogs.entries.first();
+            const entry = auditLogs.first();
             if (!entry) return;
 
             await logNukeAction(entry.executor.id, newRole.guild.id, 'ROLE_UPDATE');
@@ -310,7 +310,7 @@ async function handleRoleDelete(role) {
         if (!settings || !settings.enabled) return;
 
         const auditLogs = await fetchAuditLogs(role.guild, AUDIT_LOG_TYPES.ROLE_DELETE);
-        const entry = auditLogs.entries.first();
+        const entry = auditLogs.first();
         if (!entry) return;
 
         await logNukeAction(entry.executor.id, role.guild.id, 'ROLE_DELETE');
@@ -328,7 +328,7 @@ async function handleGuildMemberUpdate(oldMember, newMember) {
 
         if (oldMember.nickname !== newMember.nickname) {
             const auditLogs = await fetchAuditLogs(newMember.guild, AUDIT_LOG_TYPES.MEMBER_UPDATE);
-            const entry = auditLogs.entries.first();
+            const entry = auditLogs.first();
             if (!entry) return;
 
             await logNukeAction(entry.executor.id, newMember.guild.id, 'NICKNAME_UPDATE');
@@ -346,7 +346,7 @@ async function handleGuildMemberAdd(member) {
 
         if (member.user.bot) {
             const auditLogs = await fetchAuditLogs(member.guild, AUDIT_LOG_TYPES.BOT_ADD);
-            const entry = auditLogs.entries.first();
+            const entry = auditLogs.first();
             if (!entry) return;
 
             await logNukeAction(entry.executor.id, member.guild.id, 'BOT_ADD');
@@ -380,7 +380,7 @@ async function handleWebhookCreate(webhook) {
         if (!settings || !settings.enabled) return;
 
         const auditLogs = await fetchAuditLogs(webhook.guild, AUDIT_LOG_TYPES.WEBHOOK_CREATE);
-        const entry = auditLogs.entries.first();
+        const entry = auditLogs.first();
         if (!entry) return;
 
         await logNukeAction(entry.executor.id, webhook.guild.id, 'WEBHOOK_CREATE');
@@ -397,7 +397,7 @@ async function handleWebhookDelete(webhook) {
         if (!settings || !settings.enabled) return;
 
         const auditLogs = await fetchAuditLogs(webhook.guild, AUDIT_LOG_TYPES.WEBHOOK_DELETE);
-        const entry = auditLogs.entries.first();
+        const entry = auditLogs.first();
         if (!entry) return;
 
         await logNukeAction(entry.executor.id, webhook.guild.id, 'WEBHOOK_DELETE');
@@ -430,7 +430,7 @@ async function handleWebhookMessage(message) {
 
             if (recentMessages.length >= settings.maxWebhookMessages) {
                 const auditLogs = await fetchAuditLogs(message.guild, AUDIT_LOG_TYPES.MESSAGE_SEND);
-                const entry = auditLogs.entries.first();
+                const entry = auditLogs.first();
                 if (entry && entry.target.id === webhookId) {
                     await logNukeAction(entry.executor.id, message.guild.id, 'WEBHOOK_MESSAGE_SPAM');
                     await handleExcessiveActions(settings, message.guild, entry.executor.id, 'WEBHOOK_MESSAGE_SPAM', settings.maxWebhookMessages, 'webhook message spam');
@@ -441,7 +441,6 @@ async function handleWebhookMessage(message) {
         console.error('Error handling webhook message:', error);
     }
 }
-
 const dmMessageCounts = new Map();
 
 async function handleDirectMessage(message) {
