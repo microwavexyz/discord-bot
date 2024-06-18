@@ -7,6 +7,7 @@ const NodeCache = require('node-cache');
 
 const settingsCache = new NodeCache({ stdTTL: 600, checkperiod: 120 });
 const auditLogCache = new NodeCache({ stdTTL: 60, checkperiod: 30 });
+const stateCache = new NodeCache({ stdTTL: 3600, checkperiod: 600 }); // Cache to store state before nukes
 
 const AUDIT_LOG_TYPES = {
     CHANNEL_CREATE: 10,
@@ -79,6 +80,7 @@ async function banMember(guild, userId, reason) {
                 console.log(`Banning user ${userId} in guild ${guild.id} for ${reason}`);
                 await member.ban({ reason: `Anti-Nuke: ${reason}` });
                 await notifyOwner(guild, member, reason);
+                await restoreState(guild); // Restore state after banning nuker
             } else {
                 console.error('Missing BAN_MEMBERS permission or botMember is undefined.');
             }
@@ -131,6 +133,78 @@ async function fetchAuditLogs(guild, type) {
     return auditLogs;
 }
 
+async function saveStateBeforeNuke(channel, stateType) {
+    const guildId = channel.guild.id;
+    let guildState = stateCache.get(guildId) || {};
+
+    if (!guildState[stateType]) {
+        guildState[stateType] = [];
+    }
+
+    if (stateType === 'channels') {
+        guildState[stateType].push({
+            id: channel.id,
+            name: channel.name,
+            parentID: channel.parentId,
+            position: channel.position,
+            type: channel.type,
+            topic: channel.topic,
+        });
+    } else if (stateType === 'roles') {
+        guildState[stateType].push({
+            id: channel.id,
+            name: channel.name,
+            color: channel.color,
+            hoist: channel.hoist,
+            position: channel.position,
+            permissions: channel.permissions,
+            managed: channel.managed,
+            mentionable: channel.mentionable,
+        });
+    }
+
+    stateCache.set(guildId, guildState);
+}
+
+async function restoreState(guild) {
+    const guildId = guild.id;
+    const guildState = stateCache.get(guildId);
+
+    if (!guildState) return;
+
+    const restorePromises = [];
+
+    if (guildState.channels) {
+        guildState.channels.forEach(async (channelData) => {
+            const channel = await guild.channels.cache.get(channelData.id) || guild.channels.create(channelData.name, {
+                type: channelData.type,
+                parent: channelData.parentID,
+                position: channelData.position,
+                topic: channelData.topic,
+            });
+            restorePromises.push(channel);
+        });
+    }
+
+    if (guildState.roles) {
+        guildState.roles.forEach(async (roleData) => {
+            const role = await guild.roles.cache.get(roleData.id) || guild.roles.create({
+                name: roleData.name,
+                color: roleData.color,
+                hoist: roleData.hoist,
+                position: roleData.position,
+                permissions: roleData.permissions,
+                managed: roleData.managed,
+                mentionable: roleData.mentionable,
+            });
+            restorePromises.push(role);
+        });
+    }
+
+    await Promise.all(restorePromises);
+    stateCache.del(guildId); // Clear the cache after restoring state
+}
+
 async function handleChannelCreate(channel) {
     try {
         const settings = await fetchSettings(channel.guild.id);
@@ -141,6 +215,7 @@ async function handleChannelCreate(channel) {
         if (!entry) return;
 
         await logNukeAction(entry.executor.id, channel.guild.id, 'CHANNEL_CREATE');
+        await saveStateBeforeNuke(channel, 'channels');
 
         if (channel.type === 'GUILD_CATEGORY') {
             await logNukeAction(entry.executor.id, channel.guild.id, 'CATEGORY_CREATE');
@@ -164,6 +239,7 @@ async function handleChannelUpdate(oldChannel, newChannel) {
             if (!entry) return;
 
             await logNukeAction(entry.executor.id, newChannel.guild.id, 'CHANNEL_UPDATE');
+            await saveStateBeforeNuke(newChannel, 'channels');
             await handleExcessiveActions(settings, newChannel.guild, entry.executor.id, 'CHANNEL_UPDATE', settings.maxChannelRenames, 'channel renames');
 
             if (newChannel.type === 'GUILD_CATEGORY') {
@@ -185,6 +261,7 @@ async function handleChannelDelete(channel) {
         if (!entry) return;
 
         await logNukeAction(entry.executor.id, channel.guild.id, 'CHANNEL_DELETE');
+        await saveStateBeforeNuke(channel, 'channels');
         await handleExcessiveActions(settings, channel.guild, entry.executor.id, 'CHANNEL_DELETE', settings.maxChannelsDeleted, 'channel deletions');
     } catch (error) {
         console.error('Error handling channel delete:', error);
@@ -201,6 +278,7 @@ async function handleRoleCreate(role) {
         if (!entry) return;
 
         await logNukeAction(entry.executor.id, role.guild.id, 'ROLE_CREATE');
+        await saveStateBeforeNuke(role, 'roles');
         await handleExcessiveActions(settings, role.guild, entry.executor.id, 'ROLE_CREATE', settings.maxRolesCreated, 'role creations');
     } catch (error) {
         console.error('Error handling role create:', error);
@@ -218,6 +296,7 @@ async function handleRoleUpdate(oldRole, newRole) {
             if (!entry) return;
 
             await logNukeAction(entry.executor.id, newRole.guild.id, 'ROLE_UPDATE');
+            await saveStateBeforeNuke(newRole, 'roles');
             await handleExcessiveActions(settings, newRole.guild, entry.executor.id, 'ROLE_UPDATE', settings.maxRoleRenames, 'role renames');
         }
     } catch (error) {
@@ -235,6 +314,7 @@ async function handleRoleDelete(role) {
         if (!entry) return;
 
         await logNukeAction(entry.executor.id, role.guild.id, 'ROLE_DELETE');
+        await saveStateBeforeNuke(role, 'roles');
         await handleExcessiveActions(settings, role.guild, entry.executor.id, 'ROLE_DELETE', settings.maxRolesDeleted, 'role deletions');
     } catch (error) {
         console.error('Error handling role delete:', error);
@@ -304,6 +384,7 @@ async function handleWebhookCreate(webhook) {
         if (!entry) return;
 
         await logNukeAction(entry.executor.id, webhook.guild.id, 'WEBHOOK_CREATE');
+        await saveStateBeforeNuke(webhook, 'webhooks');
         await handleExcessiveActions(settings, webhook.guild, entry.executor.id, 'WEBHOOK_CREATE', settings.maxWebhooksCreated, 'webhook creations');
     } catch (error) {
         console.error('Error handling webhook create:', error);
@@ -320,6 +401,7 @@ async function handleWebhookDelete(webhook) {
         if (!entry) return;
 
         await logNukeAction(entry.executor.id, webhook.guild.id, 'WEBHOOK_DELETE');
+        await saveStateBeforeNuke(webhook, 'webhooks');
         await handleExcessiveActions(settings, webhook.guild, entry.executor.id, 'WEBHOOK_DELETE', settings.maxWebhooksDeleted, 'webhook deletions');
     } catch (error) {
         console.error('Error handling webhook delete:', error);
