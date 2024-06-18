@@ -7,6 +7,7 @@ dotenv.config();
 
 const config = require('./config.json');
 
+
 const {
     handleChannelDelete,
     handleRoleDelete,
@@ -22,9 +23,11 @@ const {
     handleWebhookMessage
 } = require('./modules/antiNuke');
 
+
 const { handleMessage: handleSpamMessage } = require('./modules/antiSpam');
 
 const { handleMessage: handleLinkMessage } = require('./modules/antiLink');
+
 
 const client = new Client({
     intents: [
@@ -37,7 +40,7 @@ const client = new Client({
 });
 client.commands = new Collection();
 
-// Load commands
+
 const commandFiles = fs.readdirSync(path.join(__dirname, 'commands')).filter(file => file.endsWith('.js'));
 
 for (const file of commandFiles) {
@@ -48,6 +51,7 @@ for (const file of commandFiles) {
         console.error(`Command file ${file} is missing required properties`);
     }
 }
+
 
 const eventFiles = fs.readdirSync(path.join(__dirname, 'events')).filter(file => file.endsWith('.js'));
 
@@ -64,7 +68,7 @@ for (const file of eventFiles) {
     }
 }
 
-// Anti-Nuke Event Handlers
+
 const antiNukeHandlers = {
     'channelDelete': handleChannelDelete,
     'roleDelete': handleRoleDelete,
@@ -88,21 +92,20 @@ for (const [event, handler] of Object.entries(antiNukeHandlers)) {
     }
 }
 
-// Anti-Spam Event Handler
 if (typeof handleSpamMessage === 'function') {
     client.on('messageCreate', handleSpamMessage);
 } else {
     console.error('Anti-Spam handler is not a function');
 }
 
-// Anti-Link Event Handler
+
 if (typeof handleLinkMessage === 'function') {
     client.on('messageCreate', handleLinkMessage);
 } else {
     console.error('Anti-Link handler is not a function');
 }
 
-// Anti-Ghost Ping Event Handler
+
 client.on('messageDelete', async (message) => {
     try {
         const messageDelete = require('./events/messageDelete');
@@ -131,6 +134,7 @@ client.on('messageCreate', async (message) => {
   }
 });
 
+
 mongoose.connect(process.env.MONGO_URI, {
     useNewUrlParser: true,
     useUnifiedTopology: true,
@@ -142,3 +146,4 @@ mongoose.connect(process.env.MONGO_URI, {
 });
 
 client.login(config.token);
+
