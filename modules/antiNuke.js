@@ -46,7 +46,7 @@ async function notifyOwner(guild, member, reason) {
             const embed = new EmbedBuilder()
                 .setTitle(`User Banned for Excessive ${reason}`)
                 .setDescription(`User ${member.user.tag} (${member.user.id}) was banned for ${reason}.`)
-                .setColor('RED')
+                .setColor('Red')
                 .setTimestamp();
 
             await owner.send({ content: `<@${owner.id}>`, embeds: [embed] });
@@ -127,14 +127,23 @@ async function fetchAuditLogs(guild, type) {
     const cacheKey = `${guild.id}-${type}`;
     let auditLogs = auditLogCache.get(cacheKey);
     if (!auditLogs) {
-        auditLogs = await guild.fetchAuditLogs({ type, limit: 1 });
-        auditLogCache.set(cacheKey, auditLogs.entries);
+        const fetchedLogs = await guild.fetchAuditLogs({ type, limit: 1 });
+        auditLogs = fetchedLogs.entries;
+        auditLogCache.set(cacheKey, auditLogs);
     }
-    return auditLogCache.get(cacheKey);
+    return auditLogs;
 }
 
-async function saveStateBeforeNuke(channel, stateType) {
-    const guildId = channel.guild.id;
+function getFirstAuditLogEntry(auditLogs) {
+    if (auditLogs) {
+        const entries = [...auditLogs.values()];
+        return entries.length > 0 ? entries[0] : null;
+    }
+    return null;
+}
+
+async function saveStateBeforeNuke(guild, entity, stateType) {
+    const guildId = guild.id;
     let guildState = stateCache.get(guildId) || {};
 
     if (!guildState[stateType]) {
@@ -143,23 +152,23 @@ async function saveStateBeforeNuke(channel, stateType) {
 
     if (stateType === 'channels') {
         guildState[stateType].push({
-            id: channel.id,
-            name: channel.name,
-            parentID: channel.parentId,
-            position: channel.position,
-            type: channel.type,
-            topic: channel.topic,
+            id: entity.id,
+            name: entity.name,
+            parentID: entity.parentId,
+            position: entity.position,
+            type: entity.type,
+            topic: entity.topic,
         });
     } else if (stateType === 'roles') {
         guildState[stateType].push({
-            id: channel.id,
-            name: channel.name,
-            color: channel.color,
-            hoist: channel.hoist,
-            position: channel.position,
-            permissions: channel.permissions,
-            managed: channel.managed,
-            mentionable: channel.mentionable,
+            id: entity.id,
+            name: entity.name,
+            color: entity.color,
+            hoist: entity.hoist,
+            position: entity.position,
+            permissions: entity.permissions,
+            managed: entity.managed,
+            mentionable: entity.mentionable,
         });
     }
 
@@ -176,28 +185,40 @@ async function restoreState(guild) {
 
     if (guildState.channels) {
         guildState.channels.forEach(async (channelData) => {
-            const channel = await guild.channels.cache.get(channelData.id) || guild.channels.create(channelData.name, {
-                type: channelData.type,
-                parent: channelData.parentID,
-                position: channelData.position,
-                topic: channelData.topic,
-            });
-            restorePromises.push(channel);
+            const channel = guild.channels.cache.get(channelData.id);
+            if (channel) {
+                restorePromises.push(channel.delete(`Anti-Nuke: Restoring state`));
+            } else {
+                restorePromises.push(
+                    guild.channels.create(channelData.name, {
+                        type: channelData.type,
+                        parent: channelData.parentID,
+                        position: channelData.position,
+                        topic: channelData.topic,
+                    })
+                );
+            }
         });
     }
 
     if (guildState.roles) {
         guildState.roles.forEach(async (roleData) => {
-            const role = await guild.roles.cache.get(roleData.id) || guild.roles.create({
-                name: roleData.name,
-                color: roleData.color,
-                hoist: roleData.hoist,
-                position: roleData.position,
-                permissions: roleData.permissions,
-                managed: roleData.managed,
-                mentionable: roleData.mentionable,
-            });
-            restorePromises.push(role);
+            const role = guild.roles.cache.get(roleData.id);
+            if (role) {
+                restorePromises.push(role.delete(`Anti-Nuke: Restoring state`));
+            } else {
+                restorePromises.push(
+                    guild.roles.create({
+                        name: roleData.name,
+                        color: roleData.color,
+                        hoist: roleData.hoist,
+                        position: roleData.position,
+                        permissions: roleData.permissions,
+                        managed: roleData.managed,
+                        mentionable: roleData.mentionable,
+                    })
+                );
+            }
         });
     }
 
@@ -211,11 +232,12 @@ async function handleChannelCreate(channel) {
         if (!settings || !settings.enabled) return;
 
         const auditLogs = await fetchAuditLogs(channel.guild, AUDIT_LOG_TYPES.CHANNEL_CREATE);
-        const entry = auditLogs.first();
-        if (!entry) return;
+        const entry = getFirstAuditLogEntry(auditLogs);
+        console.log(`Audit Log Entry for CHANNEL_CREATE: ${JSON.stringify(entry)}`);
+        if (!entry || !entry.executor) return;
 
         await logNukeAction(entry.executor.id, channel.guild.id, 'CHANNEL_CREATE');
-        await saveStateBeforeNuke(channel, 'channels');
+        await saveStateBeforeNuke(channel.guild, channel, 'channels');
 
         if (channel.type === 'GUILD_CATEGORY') {
             await logNukeAction(entry.executor.id, channel.guild.id, 'CATEGORY_CREATE');
@@ -235,11 +257,12 @@ async function handleChannelUpdate(oldChannel, newChannel) {
 
         if (oldChannel.name !== newChannel.name) {
             const auditLogs = await fetchAuditLogs(newChannel.guild, AUDIT_LOG_TYPES.CHANNEL_UPDATE);
-            const entry = auditLogs.first();
-            if (!entry) return;
+            const entry = getFirstAuditLogEntry(auditLogs);
+            console.log(`Audit Log Entry for CHANNEL_UPDATE: ${JSON.stringify(entry)}`);
+            if (!entry || !entry.executor) return;
 
             await logNukeAction(entry.executor.id, newChannel.guild.id, 'CHANNEL_UPDATE');
-            await saveStateBeforeNuke(newChannel, 'channels');
+            await saveStateBeforeNuke(newChannel.guild, newChannel, 'channels');
             await handleExcessiveActions(settings, newChannel.guild, entry.executor.id, 'CHANNEL_UPDATE', settings.maxChannelRenames, 'channel renames');
 
             if (newChannel.type === 'GUILD_CATEGORY') {
@@ -257,11 +280,12 @@ async function handleChannelDelete(channel) {
         if (!settings || !settings.enabled) return;
 
         const auditLogs = await fetchAuditLogs(channel.guild, AUDIT_LOG_TYPES.CHANNEL_DELETE);
-        const entry = auditLogs.first();
-        if (!entry) return;
+        const entry = getFirstAuditLogEntry(auditLogs);
+        console.log(`Audit Log Entry for CHANNEL_DELETE: ${JSON.stringify(entry)}`);
+        if (!entry || !entry.executor) return;
 
         await logNukeAction(entry.executor.id, channel.guild.id, 'CHANNEL_DELETE');
-        await saveStateBeforeNuke(channel, 'channels');
+        await saveStateBeforeNuke(channel.guild, channel, 'channels');
         await handleExcessiveActions(settings, channel.guild, entry.executor.id, 'CHANNEL_DELETE', settings.maxChannelsDeleted, 'channel deletions');
     } catch (error) {
         console.error('Error handling channel delete:', error);
@@ -274,11 +298,12 @@ async function handleRoleCreate(role) {
         if (!settings || !settings.enabled) return;
 
         const auditLogs = await fetchAuditLogs(role.guild, AUDIT_LOG_TYPES.ROLE_CREATE);
-        const entry = auditLogs.first();
-        if (!entry) return;
+        const entry = getFirstAuditLogEntry(auditLogs);
+        console.log(`Audit Log Entry for ROLE_CREATE: ${JSON.stringify(entry)}`);
+        if (!entry || !entry.executor) return;
 
         await logNukeAction(entry.executor.id, role.guild.id, 'ROLE_CREATE');
-        await saveStateBeforeNuke(role, 'roles');
+        await saveStateBeforeNuke(role.guild, role, 'roles');
         await handleExcessiveActions(settings, role.guild, entry.executor.id, 'ROLE_CREATE', settings.maxRolesCreated, 'role creations');
     } catch (error) {
         console.error('Error handling role create:', error);
@@ -292,11 +317,12 @@ async function handleRoleUpdate(oldRole, newRole) {
 
         if (oldRole.name !== newRole.name) {
             const auditLogs = await fetchAuditLogs(newRole.guild, AUDIT_LOG_TYPES.ROLE_UPDATE);
-            const entry = auditLogs.first();
-            if (!entry) return;
+            const entry = getFirstAuditLogEntry(auditLogs);
+            console.log(`Audit Log Entry for ROLE_UPDATE: ${JSON.stringify(entry)}`);
+            if (!entry || !entry.executor) return;
 
             await logNukeAction(entry.executor.id, newRole.guild.id, 'ROLE_UPDATE');
-            await saveStateBeforeNuke(newRole, 'roles');
+            await saveStateBeforeNuke(newRole.guild, newRole, 'roles');
             await handleExcessiveActions(settings, newRole.guild, entry.executor.id, 'ROLE_UPDATE', settings.maxRoleRenames, 'role renames');
         }
     } catch (error) {
@@ -310,11 +336,12 @@ async function handleRoleDelete(role) {
         if (!settings || !settings.enabled) return;
 
         const auditLogs = await fetchAuditLogs(role.guild, AUDIT_LOG_TYPES.ROLE_DELETE);
-        const entry = auditLogs.first();
-        if (!entry) return;
+        const entry = getFirstAuditLogEntry(auditLogs);
+        console.log(`Audit Log Entry for ROLE_DELETE: ${JSON.stringify(entry)}`);
+        if (!entry || !entry.executor) return;
 
         await logNukeAction(entry.executor.id, role.guild.id, 'ROLE_DELETE');
-        await saveStateBeforeNuke(role, 'roles');
+        await saveStateBeforeNuke(role.guild, role, 'roles');
         await handleExcessiveActions(settings, role.guild, entry.executor.id, 'ROLE_DELETE', settings.maxRolesDeleted, 'role deletions');
     } catch (error) {
         console.error('Error handling role delete:', error);
@@ -328,8 +355,9 @@ async function handleGuildMemberUpdate(oldMember, newMember) {
 
         if (oldMember.nickname !== newMember.nickname) {
             const auditLogs = await fetchAuditLogs(newMember.guild, AUDIT_LOG_TYPES.MEMBER_UPDATE);
-            const entry = auditLogs.first();
-            if (!entry) return;
+            const entry = getFirstAuditLogEntry(auditLogs);
+            console.log(`Audit Log Entry for MEMBER_UPDATE: ${JSON.stringify(entry)}`);
+            if (!entry || !entry.executor) return;
 
             await logNukeAction(entry.executor.id, newMember.guild.id, 'NICKNAME_UPDATE');
             await handleExcessiveActions(settings, newMember.guild, entry.executor.id, 'NICKNAME_UPDATE', settings.maxNicknamesChanged, 'nickname changes');
@@ -346,8 +374,9 @@ async function handleGuildMemberAdd(member) {
 
         if (member.user.bot) {
             const auditLogs = await fetchAuditLogs(member.guild, AUDIT_LOG_TYPES.BOT_ADD);
-            const entry = auditLogs.first();
-            if (!entry) return;
+            const entry = getFirstAuditLogEntry(auditLogs);
+            console.log(`Audit Log Entry for BOT_ADD: ${JSON.stringify(entry)}`);
+            if (!entry || !entry.executor) return;
 
             await logNukeAction(entry.executor.id, member.guild.id, 'BOT_ADD');
             await handleExcessiveActions(settings, member.guild, entry.executor.id, 'BOT_ADD', settings.maxBotsAdded, 'bot additions');
@@ -380,11 +409,12 @@ async function handleWebhookCreate(webhook) {
         if (!settings || !settings.enabled) return;
 
         const auditLogs = await fetchAuditLogs(webhook.guild, AUDIT_LOG_TYPES.WEBHOOK_CREATE);
-        const entry = auditLogs.first();
-        if (!entry) return;
+        const entry = getFirstAuditLogEntry(auditLogs);
+        console.log(`Audit Log Entry for WEBHOOK_CREATE: ${JSON.stringify(entry)}`);
+        if (!entry || !entry.executor) return;
 
         await logNukeAction(entry.executor.id, webhook.guild.id, 'WEBHOOK_CREATE');
-        await saveStateBeforeNuke(webhook, 'webhooks');
+        await saveStateBeforeNuke(webhook.guild, webhook, 'webhooks');
         await handleExcessiveActions(settings, webhook.guild, entry.executor.id, 'WEBHOOK_CREATE', settings.maxWebhooksCreated, 'webhook creations');
     } catch (error) {
         console.error('Error handling webhook create:', error);
@@ -397,11 +427,12 @@ async function handleWebhookDelete(webhook) {
         if (!settings || !settings.enabled) return;
 
         const auditLogs = await fetchAuditLogs(webhook.guild, AUDIT_LOG_TYPES.WEBHOOK_DELETE);
-        const entry = auditLogs.first();
-        if (!entry) return;
+        const entry = getFirstAuditLogEntry(auditLogs);
+        console.log(`Audit Log Entry for WEBHOOK_DELETE: ${JSON.stringify(entry)}`);
+        if (!entry || !entry.executor) return;
 
         await logNukeAction(entry.executor.id, webhook.guild.id, 'WEBHOOK_DELETE');
-        await saveStateBeforeNuke(webhook, 'webhooks');
+        await saveStateBeforeNuke(webhook.guild, webhook, 'webhooks');
         await handleExcessiveActions(settings, webhook.guild, entry.executor.id, 'WEBHOOK_DELETE', settings.maxWebhooksDeleted, 'webhook deletions');
     } catch (error) {
         console.error('Error handling webhook delete:', error);
@@ -430,7 +461,8 @@ async function handleWebhookMessage(message) {
 
             if (recentMessages.length >= settings.maxWebhookMessages) {
                 const auditLogs = await fetchAuditLogs(message.guild, AUDIT_LOG_TYPES.MESSAGE_SEND);
-                const entry = auditLogs.first();
+                const entry = getFirstAuditLogEntry(auditLogs);
+                console.log(`Audit Log Entry for WEBHOOK_MESSAGE: ${JSON.stringify(entry)}`);
                 if (entry && entry.target.id === webhookId) {
                     await logNukeAction(entry.executor.id, message.guild.id, 'WEBHOOK_MESSAGE_SPAM');
                     await handleExcessiveActions(settings, message.guild, entry.executor.id, 'WEBHOOK_MESSAGE_SPAM', settings.maxWebhookMessages, 'webhook message spam');
@@ -441,6 +473,7 @@ async function handleWebhookMessage(message) {
         console.error('Error handling webhook message:', error);
     }
 }
+
 const dmMessageCounts = new Map();
 
 async function handleDirectMessage(message) {
