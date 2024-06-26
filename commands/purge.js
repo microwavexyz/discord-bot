@@ -9,13 +9,8 @@ module.exports = {
     const amount = interaction.options.getInteger('amount', true);
     const channel = interaction.channel;
 
-    if (!interaction.guild?.members.me?.permissions.has(PermissionsBitField.Flags.ManageMessages)) {
-      await interaction.reply({ content: 'I do not have permission to manage messages in this channel.', ephemeral: true });
-      return;
-    }
-
-    if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageMessages)) {
-      await interaction.reply({ content: 'You do not have permission to manage messages in this channel.', ephemeral: true });
+    if (!interaction.guild?.members.me?.permissions.has(PermissionsBitField.Flags.ManageMessages) || !interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageMessages)) {
+      await interaction.reply({ content: 'You or I do not have permission to manage messages in this channel.', ephemeral: true });
       return;
     }
 
