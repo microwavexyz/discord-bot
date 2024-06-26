@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { CommandInteraction, Guild, TextChannel, PermissionsBitField } = require('discord.js');
+const { ChannelType, PermissionsBitField } = require('discord.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -12,14 +12,8 @@ module.exports = {
   async execute(interaction) {
     const suggestion = interaction.options.getString('suggestion', true);
 
-    if (!suggestion) {
-      await interaction.reply({ content: 'You need to provide a suggestion!', ephemeral: true });
-      return;
-    }
-
     const guild = interaction.guild;
 
-    // Find or create the suggestions channel
     let suggestionsChannel = guild.channels.cache.find(channel => channel.name === 'suggestions' && channel.type === ChannelType.GuildText);
     if (!suggestionsChannel) {
       try {
@@ -27,6 +21,13 @@ module.exports = {
           name: 'suggestions',
           type: ChannelType.GuildText,
           topic: 'Channel for user suggestions',
+          permissionOverwrites: [
+            {
+              id: guild.roles.everyone,
+              allow: [PermissionsBitField.Flags.ViewChannel],
+              deny: [PermissionsBitField.Flags.SendMessages],
+            }
+          ],
         });
       } catch (error) {
         console.error('Error creating suggestions channel:', error);

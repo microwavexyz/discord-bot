@@ -17,12 +17,10 @@ module.exports = {
       return;
     }
 
-    
     if (!interaction.guild?.members.me?.permissions.has(PermissionsBitField.Flags.ManageRoles)) {
       await interaction.reply({ content: 'I do not have permission to manage roles in this server.', ephemeral: true });
       return;
     }
-
 
     if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.ManageRoles)) {
       await interaction.reply({ content: 'You do not have permission to manage roles in this server.', ephemeral: true });
@@ -36,9 +34,9 @@ module.exports = {
 
     try {
       await role.setColor(color);
-      await interaction.reply({ content: `Changed color of ${role.name} to ${color}.` });
+      await interaction.reply({ content: `Changed the color of ${role.name} to ${color}.` });
     } catch (error) {
-      console.error(error);
+      console.error('Error changing role color:', error);
       await interaction.reply({ content: 'Could not change role color. Please try again.', ephemeral: true });
     }
   },

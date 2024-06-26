@@ -1,6 +1,22 @@
-const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle } = require('discord.js');
-const { ModalSubmitInteraction } = require('discord-modals');
+const { EmbedBuilder, ActionRowBuilder, ButtonBuilder, ButtonStyle, PermissionsBitField } = require('discord.js');
+const fs = require('fs');
+const path = require('path');
 require('dotenv').config();
+
+// Helper function to update environment variables
+function updateEnvVariable(key, value) {
+    const envPath = path.resolve(__dirname, '..', '.env');
+    const envVars = fs.readFileSync(envPath, 'utf8').split('\n').filter(line => line.trim());
+    const varIndex = envVars.findIndex(line => line.startsWith(key + '='));
+
+    if (varIndex !== -1) {
+        envVars[varIndex] = `${key}=${value}`;
+    } else {
+        envVars.push(`${key}=${value}`);
+    }
+
+    fs.writeFileSync(envPath, envVars.join('\n'));
+}
 
 module.exports = {
     name: 'interactionCreate',
@@ -21,33 +37,36 @@ module.exports = {
                 let applicationChannelID = process.env.APPLICATION_CHANNEL_ID;
                 let acceptedChannelID = process.env.ACCEPTED_CHANNEL_ID;
 
-                // Create the application channel if it doesn't exist
                 let applicationChannel = interaction.guild.channels.cache.get(applicationChannelID);
                 if (!applicationChannel) {
-                    applicationChannel = await interaction.guild.channels.create('applications', {
-                        type: 'text',
+                    applicationChannel = await interaction.guild.channels.create({
+                        name: 'applications',
+                        type: 0,
                         permissionOverwrites: [
                             {
                                 id: interaction.guild.id,
-                                deny: ['ViewChannel'],
+                                deny: [PermissionsBitField.Flags.ViewChannel],
                             },
                         ],
                     });
+
+                    updateEnvVariable('APPLICATION_CHANNEL_ID', applicationChannel.id);
                     applicationChannelID = applicationChannel.id;
                 }
 
-                // Create the accepted applications channel if it doesn't exist
                 let acceptedChannel = interaction.guild.channels.cache.get(acceptedChannelID);
                 if (!acceptedChannel) {
-                    acceptedChannel = await interaction.guild.channels.create('accepted-applications', {
-                        type: 'text',
+                    acceptedChannel = await interaction.guild.channels.create({
+                        name: 'accepted-applications',
+                        type: 0,
                         permissionOverwrites: [
                             {
                                 id: interaction.guild.id,
-                                deny: ['ViewChannel'],
+                                deny: [PermissionsBitField.Flags.ViewChannel],
                             },
                         ],
                     });
+                    updateEnvVariable('ACCEPTED_CHANNEL_ID', acceptedChannel.id);
                     acceptedChannelID = acceptedChannel.id;
                 }
 
@@ -116,24 +135,37 @@ module.exports = {
                             .setStyle(ButtonStyle.Danger)
                     );
 
-                const sentMessage = await applicationChannel.send({ embeds: [embed], components: [buttons] });
-
-                const collector = sentMessage.createMessageComponentCollector({ componentType: 2, time: 86400000 });
-
-                collector.on('collect', async i => {
-                    if (i.customId === 'accept') {
-                        await acceptedChannel.send({ embeds: [embed] });
-                        await i.update({ content: 'Application accepted!', components: [] });
-                    } else if (i.customId === 'deny') {
-                        await i.update({ content: 'Application denied!', components: [] });
-                    }
-                });
-
+                await applicationChannel.send({ embeds: [embed], components: [buttons] });
                 await interaction.reply({ content: 'Your application has been submitted successfully.', ephemeral: true });
             } catch (error) {
                 console.error('Error handling modal submit interaction:', error);
                 await interaction.reply({ content: 'There was an error while submitting your application. Please try again later.', ephemeral: true });
             }
+        } else if (interaction.isButton()) {
+            try {
+                await interaction.deferUpdate();
+
+                if (interaction.customId === 'accept') {
+                    const embed = interaction.message.embeds[0];
+                    const acceptedChannelID = process.env.ACCEPTED_CHANNEL_ID;
+                    const acceptedChannel = interaction.guild.channels.cache.get(acceptedChannelID);
+
+                    if (acceptedChannel) {
+                        await acceptedChannel.send({ embeds: [embed] });
+                        await interaction.message.edit({ content: 'Application accepted!', embeds: [embed], components: [] });
+                        await interaction.followUp({ content: 'Application accepted!', ephemeral: true });
+                    } else {
+                        await interaction.followUp({ content: 'Accepted channel not found.', ephemeral: true });
+                    }
+                } else if (interaction.customId === 'deny') {
+                    const embed = interaction.message.embeds[0];
+                    await interaction.message.edit({ content: 'Application denied!', embeds: [embed], components: [] });
+                    await interaction.followUp({ content: 'Application denied!', ephemeral: true });
+                }
+            } catch (error) {
+                console.error('Error handling button interaction:', error);
+                await interaction.followUp({ content: 'An error occurred while processing the application.', ephemeral: true });
+            }
         }
-    }
+    },
 };

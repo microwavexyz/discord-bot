@@ -10,7 +10,6 @@ module.exports = {
     const user = interaction.options.getUser('user', true);
     const message = interaction.options.getString('message', true);
 
-    
     if (!interaction.guild?.members.me?.permissions.has(PermissionsBitField.Flags.SendMessages)) {
       await interaction.reply({ content: 'I need permission to send messages in this server.', ephemeral: true });
       return;
@@ -21,7 +20,14 @@ module.exports = {
       await interaction.reply({ content: `Sent a DM to ${user.tag}: ${message}`, ephemeral: true });
     } catch (error) {
       console.error(error);
-      await interaction.reply({ content: 'Could not send a DM. The user might have DMs disabled or blocked the bot.', ephemeral: true });
+
+      let errorMessage = 'Could not send a DM. The user might have DMs disabled or blocked the bot.';
+
+      if (error.code === 50007) { 
+        errorMessage = 'Could not send a DM. The user has DMs disabled or has blocked the bot.';
+      }
+
+      await interaction.reply({ content: errorMessage, ephemeral: true });
     }
   },
 };

@@ -7,58 +7,71 @@ module.exports = {
         .setName('backup')
         .setDescription('Create a backup of the server configuration.'),
     async execute(interaction) {
-        const guild = interaction.guild;
+        try {
+            const guild = interaction.guild;
 
-        // Fetch channels and roles
-        const channels = guild.channels.cache.map(channel => ({
-            id: channel.id,
-            name: channel.name,
-            type: channel.type,
-            parentID: channel.parentId,
-            permissionOverwrites: channel.permissionOverwrites.cache.map(overwrite => ({
-                id: overwrite.id,
-                type: overwrite.type,
-                allow: overwrite.allow.toArray(),
-                deny: overwrite.deny.toArray(),
-            })),
-        }));
+            // Fetch channels and roles in parallel
+            const [channels, roles] = await Promise.all([
+                guild.channels.fetch(),
+                guild.roles.fetch(),
+            ]);
 
-        const roles = guild.roles.cache.map(role => ({
-            id: role.id,
-            name: role.name,
-            color: role.color,
-            hoist: role.hoist,
-            position: role.position,
-            permissions: role.permissions.toArray(),
-            mentionable: role.mentionable,
-        }));
+            // Map channels and roles to required data
+            const channelData = channels.map(channel => ({
+                id: channel.id,
+                name: channel.name,
+                type: channel.type,
+                parentID: channel.parentId,
+                permissionOverwrites: channel.permissionOverwrites.cache.map(overwrite => ({
+                    id: overwrite.id,
+                    type: overwrite.type,
+                    allow: overwrite.allow.bitfield,
+                    deny: overwrite.deny.bitfield,
+                })),
+            }));
 
-        // Create a new backup
-        const backup = new Backup({
-            guildID: guild.id,
-            channels,
-            roles,
-        });
+            const roleData = roles.map(role => ({
+                id: role.id,
+                name: role.name,
+                color: role.color,
+                hoist: role.hoist,
+                position: role.position,
+                permissions: role.permissions.bitfield,
+                mentionable: role.mentionable,
+            }));
 
-        // Save backup to the database
-        await backup.save();
+            // Create a new backup
+            const backup = new Backup({
+                guildID: guild.id,
+                channels: channelData,
+                roles: roleData,
+            });
 
-        // Ensure only the latest 3 backups are stored
-        const backups = await Backup.find({ guildID: guild.id }).sort({ timestamp: -1 });
-        if (backups.length > 3) {
-            const oldestBackup = backups[backups.length - 1];
-            await Backup.findByIdAndDelete(oldestBackup._id);
+            // Save backup to the database
+            await backup.save();
+
+            // Ensure only the latest 3 backups are stored
+            const backups = await Backup.find({ guildID: guild.id }).sort({ timestamp: -1 });
+            if (backups.length > 3) {
+                const backupsToDelete = backups.slice(3);
+                for (const backup of backupsToDelete) {
+                    await Backup.findByIdAndDelete(backup._id);
+                }
+            }
+
+            // Calculate backup number
+            const backupNumber = await Backup.countDocuments({ guildID: guild.id });
+
+            const embed = new EmbedBuilder()
+                .setColor('#0099ff')
+                .setTitle('Backup Created')
+                .setDescription(`Backup number **${backupNumber}** has been created successfully.`)
+                .setTimestamp();
+
+            await interaction.reply({ embeds: [embed] });
+        } catch (error) {
+            console.error('Error creating backup:', error);
+            await interaction.reply({ content: 'An error occurred while creating the backup. Please try again later.', ephemeral: true });
         }
-
-        // Calculate backup number
-        const backupNumber = await Backup.countDocuments({ guildID: guild.id });
-
-        const embed = new EmbedBuilder()
-            .setColor('#0099ff')
-            .setTitle('Backup Created')
-            .setDescription(`Backup number **${backupNumber}** has been created successfully.`)
-            .setTimestamp();
-
-        await interaction.reply({ embeds: [embed] });
     },
 };

@@ -1,4 +1,4 @@
-const { SlashCommandBuilder, ChannelType } = require('discord.js');
+const { SlashCommandBuilder, ChannelType, PermissionsBitField } = require('discord.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -31,24 +31,34 @@ module.exports = {
       return;
     }
 
-    const targetMember = await interaction.guild.members.fetch(targetUser.id);
-
-    if (!targetMember) {
-      await interaction.reply({ content: 'User not found in this server.', ephemeral: true });
+    if (!channel.permissionsFor(interaction.guild.members.me).has(PermissionsBitField.Flags.ManageMessages)) {
+      await interaction.reply({ content: 'I need the Manage Messages permission to execute this command.', ephemeral: true });
       return;
     }
 
     await interaction.deferReply({ ephemeral: true });
 
     try {
-      const messages = await channel.messages.fetch({ limit: 100 });
-      const userMessages = messages.filter(msg => msg.author.id === targetUser.id);
+      let deletedMessagesCount = 0;
+      let lastMessageId = null;
 
-      for (const message of userMessages.values()) {
-        await message.delete();
+      while (true) {
+        const fetchOptions = { limit: 100 };
+        if (lastMessageId) fetchOptions.before = lastMessageId;
+
+        const messages = await channel.messages.fetch(fetchOptions);
+        const userMessages = messages.filter(msg => msg.author.id === targetUser.id);
+
+        if (userMessages.size === 0) break;
+
+        await channel.bulkDelete(userMessages, true);
+        deletedMessagesCount += userMessages.size;
+        lastMessageId = messages.last().id;
+
+        if (messages.size < 100) break;
       }
 
-      await interaction.followUp({ content: `Successfully deleted ${userMessages.size} messages from ${targetUser.tag} in ${channel.name}.`, ephemeral: true });
+      await interaction.followUp({ content: `Successfully deleted ${deletedMessagesCount} messages from ${targetUser.tag} in ${channel.name}.`, ephemeral: true });
     } catch (error) {
       console.error('Error deleting messages:', error);
       await interaction.followUp({ content: 'An error occurred while trying to delete messages.', ephemeral: true });

@@ -12,11 +12,9 @@ const whitelist = new Set(config.whitelist);
 module.exports = {
   name: 'guildMemberAdd',
   async execute(member) {
-    if (cooldownLog.has(member.guild.id)) {
-      return;
-    }
+    if (!(member instanceof GuildMember)) return;
 
-    if (whitelist.has(member.id)) {
+    if (cooldownLog.has(member.guild.id) || whitelist.has(member.id)) {
       return;
     }
 
@@ -51,7 +49,7 @@ module.exports = {
       }
 
       const membersToKickOrBan = member.guild.members.cache.filter(m => updatedLog.includes(m.joinedTimestamp));
-      for (const [id, m] of membersToKickOrBan) {
+      for (const m of membersToKickOrBan.values()) {
         try {
           await m.kick('Kicked due to raid detection');
         } catch (error) {
@@ -61,17 +59,19 @@ module.exports = {
 
       try {
         const invites = await member.guild.invites.fetch();
-        for (const [code, invite] of invites) {
-          await invite.delete('Disabled due to raid detection');
+        for (const invite of invites.values()) {
+          try {
+            await invite.delete('Disabled due to raid detection');
+          } catch (error) {
+            console.error(`Failed to delete invite ${invite.code}:`, error);
+          }
         }
       } catch (error) {
-        console.error('Failed to delete invites:', error);
+        console.error('Failed to fetch invites:', error);
       }
 
       cooldownLog.add(member.guild.id);
-      setTimeout(() => {
-        cooldownLog.delete(member.guild.id);
-      }, cooldownPeriod);
+      setTimeout(() => cooldownLog.delete(member.guild.id), cooldownPeriod);
     }
   },
 };

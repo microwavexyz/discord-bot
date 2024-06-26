@@ -18,9 +18,6 @@ class CaseManager {
       });
   }
 
-  async saveCases() {
-  }
-
   async createCase(user, moderator, command, reason) {
     const newCase = {
       user,
@@ -78,7 +75,8 @@ class CaseManager {
   async clearWarnings(userId) {
     try {
       const result = await this.warningsCollection.deleteMany({ userId });
-      return result;
+      console.log(`Cleared ${result.deletedCount} warnings for user ${userId}`);
+      return result.deletedCount;
     } catch (error) {
       console.error('Error clearing warnings:', error);
       throw error;
@@ -92,6 +90,15 @@ class CaseManager {
     } catch (error) {
       console.error('Error retrieving warnings:', error);
       throw error;
+    }
+  }
+
+  async disconnect() {
+    try {
+      await this.client.close();
+      console.log('Disconnected from MongoDB');
+    } catch (error) {
+      console.error('Error disconnecting from MongoDB:', error);
     }
   }
 }

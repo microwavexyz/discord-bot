@@ -10,7 +10,7 @@ const channelTypes = {
     13: ChannelType.GuildStageVoice,
 };
 
-async function restoreRoles(guild, roleData) {
+async function restoreRoles(guild, roleData, interaction, loadingMessage) {
     try {
         let role = guild.roles.cache.get(roleData.id);
         if (role) {
@@ -39,13 +39,13 @@ async function restoreRoles(guild, roleData) {
                 console.warn(`Role ${roleData.name} already exists with similar properties.`);
             }
         }
+        await interaction.editReply({ content: `${loadingMessage}\nRestoring roles: ${roleData.name}...`, ephemeral: true });
     } catch (error) {
         console.error(`Error restoring role ${roleData.name}:`, error);
-        throw error;
     }
 }
 
-async function restoreChannels(guild, channelData) {
+async function restoreChannels(guild, channelData, interaction, loadingMessage) {
     try {
         console.log('Restoring channel:', channelData);
         let channel = guild.channels.cache.get(channelData.id);
@@ -79,9 +79,9 @@ async function restoreChannels(guild, channelData) {
                 console.warn(`Channel ${channelData.name} already exists with similar properties.`);
             }
         }
+        await interaction.editReply({ content: `${loadingMessage}\nRestoring channels: ${channelData.name}...`, ephemeral: true });
     } catch (error) {
         console.error(`Error restoring channel ${channelData.name}:`, error);
-        throw error;
     }
 }
 
@@ -108,14 +108,17 @@ module.exports = {
         const backup = backups[backupNumber - 1];
 
         try {
+            let loadingMessage = '⏳ Restoring server configuration...';
+            await interaction.editReply({ content: loadingMessage, ephemeral: true });
+
             // Restore roles
             for (const roleData of backup.roles) {
-                await restoreRoles(guild, roleData);
+                await restoreRoles(guild, roleData, interaction, loadingMessage);
             }
 
             // Restore channels
             for (const channelData of backup.channels) {
-                await restoreChannels(guild, channelData);
+                await restoreChannels(guild, channelData, interaction, loadingMessage);
             }
 
             const embed = new EmbedBuilder()
@@ -124,7 +127,7 @@ module.exports = {
                 .setDescription(`Server configuration has been restored from backup number **${backupNumber}**.\n\n**Restored:**\n- ${backup.roles.length} roles\n- ${backup.channels.length} channels`)
                 .setTimestamp();
 
-            await interaction.followUp({ embeds: [embed] });
+            await interaction.followUp({ embeds: [embed], ephemeral: true });
         } catch (error) {
             console.error('Error restoring server:', error);
             await interaction.followUp({ content: 'An error occurred while restoring the server configuration.', ephemeral: true });

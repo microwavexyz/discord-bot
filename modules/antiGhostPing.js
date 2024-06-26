@@ -12,11 +12,13 @@ async function fetchSettings(guildId) {
 
 async function handleMentions(message, mentions) {
     try {
-        const members = await message.guild.members.fetch();
-        mentions.forEach(member => {
-            if (!members.has(member.id)) {
+        const memberFetchPromises = mentions.map(member => message.guild.members.fetch(member.id).catch(() => null));
+        const fetchedMembers = await Promise.all(memberFetchPromises);
+
+        fetchedMembers.forEach((member, index) => {
+            if (!member) {
                 message.delete();
-                message.channel.send(`${message.author}, you tried to mention a non-existent member!`);
+                message.channel.send(`${message.author}, you tried to mention a non-existent member!`).catch(console.error);
             }
         });
     } catch (error) {
@@ -34,6 +36,8 @@ module.exports = {
         if (!settings || !settings.enabled) return;
 
         const mentions = message.mentions.members;
+        if (mentions.size === 0) return;
+
         await handleMentions(message, mentions);
     }
 };

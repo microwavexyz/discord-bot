@@ -37,7 +37,7 @@ async function getUserOffenses(guildId, userId, now) {
     }
     await AntiSpam.findOneAndUpdate(
         { guildId, userId },
-        userOffenses,
+        { $set: userOffenses },
         { upsert: true, new: true }
     );
     return userOffenses.offenses;
@@ -55,33 +55,43 @@ function containsExcessiveEmojis(messageContent) {
     return emojis.length > 10;
 }
 
+function isSpammingContent(message, settings) {
+    const messageContent = message.content;
+    return (
+        messageCache.get(message.author.id).length > settings.threshold ||
+        containsExcessiveSpecialChars(messageContent) ||
+        containsExcessiveEmojis(messageContent)
+    );
+}
 async function handleSpam(message, settings) {
     const { guild, author } = message;
     if (!guild || !author) return;
     const guildId = guild.id;
     const userId = author.id;
     const now = Date.now();
+
     const userMessages = messageCache.get(userId) || [];
     const recentMessages = userMessages.filter(timestamp => now - timestamp < settings.timeFrame);
     recentMessages.push(now);
     messageCache.set(userId, recentMessages);
-    const isSpammingMessages = recentMessages.length > settings.threshold;
-    const isSpammingSpecialChars = containsExcessiveSpecialChars(message.content);
-    const isSpammingEmojis = containsExcessiveEmojis(message.content);
-    if (isSpammingMessages || isSpammingSpecialChars || isSpammingEmojis) {
+
+    if (isSpammingContent(message, settings)) {
         const member = await guild.members.fetch(userId);
-        if (!member.manageable || !guild.members.me.permissions.has('MODERATE_MEMBERS')) return;
+        if (!member.manageable || !guild.members.me.permissions.has(PermissionFlagsBits.ModerateMembers)) return;
+
         const offenses = await getUserOffenses(guildId, userId, now);
         const punishmentDuration = Math.min(5 * offenses, 1440); // Max 1440 minutes (24 hours)
+
         const messages = await message.channel.messages.fetch({ limit: 100 });
         const userMessagesToDelete = messages.filter(msg => msg.author.id === userId && now - msg.createdTimestamp < settings.timeFrame);
         await deleteMessages(userMessagesToDelete);
+
         const currentTimeout = member.communicationDisabledUntilTimestamp;
         const isAlreadyMuted = currentTimeout && currentTimeout > now;
         if (!isAlreadyMuted) {
             try {
                 await member.timeout(punishmentDuration * 60 * 1000, 'Spamming');
-                message.channel.send(`${author}, you have been muted for spamming! Duration: ${punishmentDuration} minutes`);
+                await message.channel.send(`${author}, you have been muted for spamming! Duration: ${punishmentDuration} minutes`).catch(console.error);
             } catch (error) {
                 console.error('Error timing out member:', error);
             }

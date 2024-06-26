@@ -71,11 +71,14 @@ async function isWhitelisted(guildId, { userId, webhookId }) {
 }
 
 async function logNukeAction(userId, guildId, action) {
-    console.log(`Logging nuke action: ${action} by user ${userId} in guild ${guildId}`);
-    const log = new NukeLog({ userId, guildId, action });
-    await log.save();
+    try {
+        console.log(`Logging nuke action: ${action} by user ${userId} in guild ${guildId}`);
+        const log = new NukeLog({ userId, guildId, action });
+        await log.save();
+    } catch (error) {
+        console.error(`Error logging nuke action for user ${userId} in guild ${guildId}:`, error);
+    }
 }
-
 async function notifyOwner(guild, member, reason) {
     try {
         const owner = await guild.fetchOwner();
@@ -86,12 +89,9 @@ async function notifyOwner(guild, member, reason) {
             .setTimestamp();
 
         console.log(`Notifying guild owner ${owner.user.tag} (${owner.id}) about ban of user ${member.user.tag} (${member.user.id})`);
-
-        try {
-            await owner.send({ content: `<@${owner.id}>`, embeds: [embed] });
-        } catch (sendError) {
+        await owner.send({ content: `<@${owner.id}>`, embeds: [embed] }).catch(sendError => {
             console.error(`Error sending notification to guild owner ${owner.user.tag} (${owner.id}) in guild ${guild.id}:`, sendError);
-        }
+        });
     } catch (fetchError) {
         console.error(`Error fetching guild owner for guild ${guild.id}:`, fetchError);
     }
@@ -151,7 +151,7 @@ async function banMember(guild, userId, reason) {
 
 async function handleExcessiveActions(settings, guild, userId, action, limit, reason) {
     try {
-        const timeFrame = settings.timeFrame || 60 * 60 * 1000; // Default to 1 hour if not provided
+        const timeFrame = settings.timeFrame || 60 * 60 * 1000; 
         const recentActions = await NukeLog.countDocuments({
             guildId: guild.id,
             userId,
@@ -185,16 +185,39 @@ async function handleExcessiveActions(settings, guild, userId, action, limit, re
     }
 }
 async function fetchSettings(guildId) {
-    let settings = settingsCache.get(guildId);
-    if (!settings) {
-        console.log(`Fetching settings for guild ${guildId}`);
-        settings = await ServerSettings.findOne({ guildId });
-        if (settings) {
-            console.log(`Caching settings for guild ${guildId}`);
-            settingsCache.set(guildId, settings);
+    try {
+        let settings = settingsCache.get(guildId);
+        if (!settings) {
+            console.log(`Fetching settings for guild ${guildId}`);
+            settings = await ServerSettings.findOne({ guildId });
+            if (settings) {
+                console.log(`Caching settings for guild ${guildId}`);
+                settingsCache.set(guildId, settings);
+            }
         }
+        return settings;
+    } catch (error) {
+        console.error(`Error fetching settings for guild ${guildId}:`, error);
+        return null;
     }
-    return settings;
+}
+async function handleAuditLogAction(guild, actionType, auditLogType, settingsKey, maxActions, actionName) {
+    const settings = await fetchSettings(guild.id);
+    if (!settings || !settings.enabled) return;
+
+    const auditLogs = await fetchAuditLogs(guild, auditLogType);
+    const entry = getFirstAuditLogEntry(auditLogs);
+    if (!entry || !entry.executor) return;
+
+    const botMember = await getBotMember(guild);
+    const executor = await guild.members.fetch(entry.executor.id).catch(() => null);
+    if (!executor || executor.id === botMember.id || executor.roles.highest.position >= botMember.roles.highest.position || (settings.whitelistedUsers && settings.whitelistedUsers.includes(executor.id))) return;
+
+    await logNukeAction(executor.id, guild.id, actionType);
+    const exceededActions = await handleExcessiveActions(settings, guild, executor.id, actionType, settings[maxActions], actionName);
+    if (exceededActions) {
+        await banMember(guild, executor.id, `Excessive ${actionName}`);
+    }
 }
 
 async function fetchAuditLogs(guild, type) {
@@ -377,19 +400,18 @@ async function handleChannelUpdate(oldChannel, newChannel) {
 async function handleChannelDelete(channel) {
     try {
         console.log(`Handling channel delete: ${channel.id} (${channel.name}) in guild ${channel.guild.id}`);
-        const settings = await fetchSettings(channel.guild.id);
-        if (!settings || !settings.enabled) return;
-
-        const auditLogs = await fetchAuditLogs(channel.guild, AUDIT_LOG_TYPES.CHANNEL_DELETE);
-        const entry = getFirstAuditLogEntry(auditLogs);
-        console.log(`Audit Log Entry for CHANNEL_DELETE: ${JSON.stringify(entry)}`);
-        if (!entry || !entry.executor) return;
-
-        await logNukeAction(entry.executor.id, channel.guild.id, 'CHANNEL_DELETE');
-        await saveStateBeforeNuke(channel.guild, channel, 'channels');
-        await handleExcessiveActions(settings, channel.guild, entry.executor.id, 'CHANNEL_DELETE', settings.maxChannelsDeleted, 'channel deletions');
+        await handleAuditLogAction(channel.guild, 'CHANNEL_DELETE', AUDIT_LOG_TYPES.CHANNEL_DELETE, 'maxChannelsDeleted', 'channel deletions');
     } catch (error) {
         console.error('Error handling channel delete:', error);
+    }
+}
+
+async function handleRoleDelete(role) {
+    try {
+        console.log(`Handling role delete: ${role.id} (${role.name}) in guild ${role.guild.id}`);
+        await handleAuditLogAction(role.guild, 'ROLE_DELETE', AUDIT_LOG_TYPES.ROLE_DELETE, 'maxRolesDeleted', 'role deletions');
+    } catch (error) {
+        console.error('Error handling role delete:', error);
     }
 }
 
@@ -444,7 +466,7 @@ async function handleRoleUpdate(oldRole, newRole) {
         const settings = await fetchSettings(newRole.guild.id);
         if (!settings || !settings.enabled) return;
 
-        // Check if the role update is significant
+        
         if (
             oldRole.name !== newRole.name ||
             oldRole.color !== newRole.color ||
@@ -457,14 +479,14 @@ async function handleRoleUpdate(oldRole, newRole) {
             console.log(`Audit Log Entry for ROLE_UPDATE: ${JSON.stringify(entry)}`);
             if (!entry || !entry.executor) return;
 
-            // Check if the executor is the bot itself or has a higher role position
+            
             const botMember = await getBotMember(newRole.guild);
             if (entry.executor.id === botMember.id || entry.executor.roles.highest.position >= botMember.roles.highest.position) {
                 console.log(`Ignoring role update by bot or user with higher role position: ${entry.executor.tag} (${entry.executor.id})`);
                 return;
             }
 
-            // Check if the executor is whitelisted (if applicable)
+            
             if (settings.whitelistedUsers && settings.whitelistedUsers.includes(entry.executor.id)) {
                 console.log(`Ignoring role update by whitelisted user: ${entry.executor.tag} (${entry.executor.id})`);
                 return;
@@ -490,14 +512,14 @@ async function handleRoleDelete(role) {
         console.log(`Audit Log Entry for ROLE_DELETE: ${JSON.stringify(entry)}`);
         if (!entry || !entry.executor) return;
 
-        // Check if the executor is the bot itself or has a higher role position
+        
         const botMember = await getBotMember(role.guild);
         if (entry.executor.id === botMember.id || entry.executor.roles.highest.position >= botMember.roles.highest.position) {
             console.log(`Ignoring role deletion by bot or user with higher role position: ${entry.executor.tag} (${entry.executor.id})`);
             return;
         }
 
-        // Check if the executor is whitelisted (if applicable)
+        
         if (settings.whitelistedUsers && settings.whitelistedUsers.includes(entry.executor.id)) {
             console.log(`Ignoring role deletion by whitelisted user: ${entry.executor.tag} (${entry.executor.id})`);
             return;
@@ -529,20 +551,20 @@ async function handleGuildMemberUpdate(oldMember, newMember) {
             console.log(`Audit Log Entry for MEMBER_UPDATE: ${JSON.stringify(entry)}`);
             if (!entry || !entry.executor) return;
 
-            // Check if the executor is the bot itself or has a higher role position
+            
             const botMember = await getBotMember(newMember.guild);
             if (entry.executor.id === botMember.id || entry.executor.roles.highest.position >= botMember.roles.highest.position) {
                 console.log(`Ignoring nickname change by bot or user with higher role position: ${entry.executor.tag} (${entry.executor.id})`);
                 return;
             }
 
-            // Check if the executor is whitelisted (if applicable)
+            
             if (settings.whitelistedUsers && settings.whitelistedUsers.includes(entry.executor.id)) {
                 console.log(`Ignoring nickname change by whitelisted user: ${entry.executor.tag} (${entry.executor.id})`);
                 return;
             }
 
-            // Check if the bot has the necessary permissions
+            
             if (!botMember.permissions.has('VIEW_AUDIT_LOG') || !botMember.permissions.has('MANAGE_NICKNAMES')) {
                 console.log(`Bot lacks permissions to handle nickname changes in guild ${newMember.guild.id}`);
                 return;
@@ -556,65 +578,9 @@ async function handleGuildMemberUpdate(oldMember, newMember) {
     }
 }
 
-async function handleGuildMemberAdd(member) {
-    try {
-        console.log(`Handling guild member add: ${member.id} (${member.user.tag}) in guild ${member.guild.id}`);
-        const settings = await fetchSettings(member.guild.id);
-        if (!settings || !settings.enabled) return;
-
-        const botMember = await getBotMember(member.guild);
-
-        // Check if the bot has the necessary permissions
-        if (!botMember.permissions.has('VIEW_AUDIT_LOG') || !botMember.permissions.has('BAN_MEMBERS')) {
-            console.log(`Bot lacks permissions to handle member join in guild ${member.guild.id}`);
-            return;
-        }
-
-        if (member.user.bot) {
-            const auditLogs = await fetchAuditLogs(member.guild, AUDIT_LOG_TYPES.BOT_ADD);
-            const entry = getFirstAuditLogEntry(auditLogs);
-            console.log(`Audit Log Entry for BOT_ADD: ${JSON.stringify(entry)}`);
-            if (!entry || !entry.executor) return;
-
-            // Check if the executor is whitelisted (if applicable)
-            if (settings.whitelistedUsers && settings.whitelistedUsers.includes(entry.executor.id)) {
-                console.log(`Ignoring bot addition by whitelisted user: ${entry.executor.tag} (${entry.executor.id})`);
-                return;
-            }
-
-            await logNukeAction(entry.executor.id, member.guild.id, 'BOT_ADD');
-            await handleExcessiveActions(settings, member.guild, entry.executor.id, 'BOT_ADD', settings.maxBotsAdded, 'bot additions');
-
-            // Ban the user who added the bot
-            const addedByUserId = entry.executor.id;
-            const addedByMember = await member.guild.members.fetch(addedByUserId);
-
-            // Check if the user who added the bot is the guild owner or has a higher role position than the bot
-            if (addedByMember.id === member.guild.ownerId || addedByMember.roles.highest.position >= botMember.roles.highest.position) {
-                console.log(`Cannot ban user ${addedByUserId} for adding nuke bot in guild ${member.guild.id} due to insufficient permissions`);
-                return;
-            }
-
-            console.log(`Banning user ${addedByUserId} for adding nuke bot in guild ${member.guild.id}`);
-            await banMember(member.guild, addedByUserId, 'Adding nuke bot');
-        } else {
-            // Check if the user is whitelisted (if applicable)
-            if (settings.whitelistedUsers && settings.whitelistedUsers.includes(member.id)) {
-                console.log(`Ignoring user join by whitelisted user: ${member.user.tag} (${member.id})`);
-                return;
-            }
-
-            await logNukeAction(member.id, member.guild.id, 'USER_JOIN');
-            await handleExcessiveActions(settings, member.guild, member.id, 'USER_JOIN', settings.maxUsersAdded, 'user additions');
-        }
-    } catch (error) {
-        console.error('Error handling guild member add:', error);
-    }
-}
-
 async function handleMessageCreate(message) {
     try {
-        // Ensure the message is in a guild and not a DM
+        
         if (!message.guild) return;
 
         console.log(`Handling message create by ${message.author.id} in guild ${message.guild.id}`);
@@ -623,13 +589,13 @@ async function handleMessageCreate(message) {
 
         const botMember = await getBotMember(message.guild);
 
-        // Check if the bot has the necessary permissions
+        
         if (!botMember.permissions.has('BAN_MEMBERS')) {
             console.log(`Bot lacks permission to ban members in guild ${message.guild.id}`);
             return;
         }
 
-        // Check if the user is whitelisted (if applicable)
+        
         if (settings.whitelistedUsers && settings.whitelistedUsers.includes(message.author.id)) {
             console.log(`Ignoring message with excessive mentions by whitelisted user: ${message.author.tag} (${message.author.id})`);
             return;
@@ -639,7 +605,7 @@ async function handleMessageCreate(message) {
         if (mentions >= settings.maxMentions) {
             const member = await message.guild.members.fetch(message.author.id);
 
-            // Check if the user is the guild owner or has a higher role position than the bot
+            
             if (member.id === message.guild.ownerId || member.roles.highest.position >= botMember.roles.highest.position) {
                 console.log(`Cannot ban user ${message.author.id} for excessive mentions in guild ${message.guild.id} due to insufficient permissions`);
                 return;
@@ -648,7 +614,7 @@ async function handleMessageCreate(message) {
             console.log(`Banning user ${message.author.id} for excessive mentions in guild ${message.guild.id}`);
             await banMember(message.guild, message.author.id, 'Excessive mentions');
 
-            // Delete the message with excessive mentions
+            
             if (message.deletable) {
                 await message.delete();
             }
@@ -831,7 +797,7 @@ async function handleWebhookMessage(message) {
 
             await banMember(message.guild, executor.id, 'Excessive webhook messages');
 
-            // Log the ban action
+            
             await NukeLog.create({
                 guildId: message.guild.id,
                 userId: executor.id,
@@ -855,7 +821,7 @@ async function handleDirectMessage(message) {
         const now = Date.now();
         console.log(`Handling direct message from ${userId}`);
 
-        // Check if the user is whitelisted (if applicable)
+        
         if (globalSettings.whitelistedUsers && globalSettings.whitelistedUsers.includes(userId)) {
             console.log(`Ignoring direct message from whitelisted user: ${userId}`);
             return;
@@ -871,7 +837,7 @@ async function handleDirectMessage(message) {
         dmMessageCounts.set(userId, recentMessages);
 
         if (recentMessages.length >= 10) {
-            // Check if the bot has the necessary permissions to ban users
+            
             if (!message.client.user.bot || !message.client.user.permissions.has('BAN_MEMBERS')) {
                 console.log(`Bot lacks permission to ban users`);
                 return;
@@ -880,7 +846,7 @@ async function handleDirectMessage(message) {
             console.log(`Banning user ${userId} for excessive DMs`);
 
             try {
-                // Ban the user from all shared guilds
+                
                 const sharedGuilds = message.client.guilds.cache.filter(guild => guild.members.cache.has(userId));
                 for (const guild of sharedGuilds.values()) {
                     await banMember(guild, userId, 'Excessive DMs');
@@ -902,7 +868,6 @@ module.exports = {
     handleRoleCreate,
     handleMessageCreate,
     handleRoleUpdate,
-    handleGuildMemberAdd,
     handleChannelUpdate,
     handleWebhookCreate,
     handleWebhookDelete,

@@ -6,6 +6,7 @@ module.exports = {
     .setName('cases')
     .setDescription('Fetches moderation cases for a user or all users')
     .addUserOption(option => option.setName('user').setDescription('The user to fetch cases for').setRequired(false)),
+  
   async execute(interaction) {
     const user = interaction.options.getUser('user');
 

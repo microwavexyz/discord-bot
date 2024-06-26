@@ -69,7 +69,6 @@ const antiNukeHandlers = {
     roleCreate: handleRoleCreate,
     messageCreate: handleMessageCreate,
     roleUpdate: handleRoleUpdate,
-    guildMemberAdd: handleGuildMemberAdd,
     channelUpdate: handleChannelUpdate,
     webhookMessage: handleWebhookMessage,
 };

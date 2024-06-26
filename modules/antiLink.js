@@ -2,22 +2,24 @@ const AntiLinkSettings = require('../models/AntiLinkSettings');
 
 async function fetchSettings(guildId) {
     try {
-        const settings = await AntiLinkSettings.findOne({ guildId });
-        return settings;
+        return await AntiLinkSettings.findOne({ guildId });
     } catch (error) {
         console.error(`Error fetching AntiLink settings for guild ${guildId}:`, error);
         return null;
     }
 }
 
-function containsLink(messageContent) {
+function containsProhibitedLink(messageContent, allowDiscordLinks) {
     const linkRegex = /(https?:\/\/[^\s]+)/g;
-    return linkRegex.test(messageContent);
-}
-
-function containsDiscordInvite(messageContent) {
     const discordInviteRegex = /(https?:\/\/)?(www\.)?(discord\.gg|discordapp\.com\/invite)\/[^\s]+/g;
-    return discordInviteRegex.test(messageContent);
+
+    if (linkRegex.test(messageContent)) {
+        if (!allowDiscordLinks && discordInviteRegex.test(messageContent)) {
+            return true;
+        }
+        return !discordInviteRegex.test(messageContent);
+    }
+    return false;
 }
 
 module.exports = {
@@ -34,13 +36,12 @@ module.exports = {
         if (isExempt) return;
 
         const messageContent = message.content;
-        const hasLink = containsLink(messageContent);
-        const hasDiscordInvite = containsDiscordInvite(messageContent);
+        const hasProhibitedLink = containsProhibitedLink(messageContent, settings.allowDiscordLinks);
 
-        if (hasLink || (hasDiscordInvite && !settings.allowDiscordLinks)) {
+        if (hasProhibitedLink) {
             try {
                 await message.delete();
-                message.channel.send(`${message.author}, sharing links is not allowed!`);
+                await message.channel.send(`${message.author}, sharing links is not allowed!`).catch(console.error);
             } catch (error) {
                 console.error(`Error deleting message ${message.id}:`, error);
             }
