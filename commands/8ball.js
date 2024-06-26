@@ -2,6 +2,20 @@ const { SlashCommandBuilder, PermissionsBitField, EmbedBuilder } = require('disc
 
 const cooldowns = new Map();
 
+// Array of possible answers
+const answers = [
+  'Yes',
+  'No',
+  'Maybe',
+  'Definitely',
+  'Absolutely not',
+  'I don\'t think so',
+  'It is certain',
+  'Very doubtful',
+  'Ask again later',
+  'Cannot predict now'
+];
+
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('8ball')
@@ -12,12 +26,10 @@ module.exports = {
         .setRequired(true)
     ),
   async execute(interaction) {
-    
     if (!interaction.guild?.members.me?.permissions.has(PermissionsBitField.Flags.SendMessages)) {
       return interaction.reply({ content: 'I need permission to send messages in this channel.', ephemeral: true });
     }
 
-   
     const cooldownAmount = 5000; 
     if (!cooldowns.has(interaction.commandName)) {
       cooldowns.set(interaction.commandName, new Map());
@@ -39,25 +51,9 @@ module.exports = {
     timestamps.set(interaction.user.id, now);
     setTimeout(() => timestamps.delete(interaction.user.id), cooldownAmount);
 
-    // Array of possible answers
-    const answers = [
-      'Yes',
-      'No',
-      'Maybe',
-      'Definitely',
-      'Absolutely not',
-      'I don\'t think so',
-      'It is certain',
-      'Very doubtful',
-      'Ask again later',
-      'Cannot predict now'
-    ];
-
-    
     const question = interaction.options.getString('question', true);
     const answer = answers[Math.floor(Math.random() * answers.length)];
 
-    
     const embed = new EmbedBuilder()
       .setColor(0x00AE86)
       .setTitle('🎱 8ball')
@@ -68,7 +64,6 @@ module.exports = {
       .setFooter({ text: `Asked by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL() })
       .setTimestamp();
 
-    
     await interaction.reply({ embeds: [embed] });
   },
 };
