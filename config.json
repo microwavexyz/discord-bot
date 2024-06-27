@@ -1,9 +1,9 @@
 {
-  "token": "",
-  "clientId": "",
-  "guildId": "",
-  "mongoUri": "",
+  "token": "MTE1OTMzMTY4OTI5ODkzMTcxMg.GsOCHY.r9GY8QHgN7ICUA-eU0xe2M-izbcLJfGp2WmTZE",
+  "clientId": "1159331689298931712",
+  "guildId": "1253173466580914328",
+  "mongoUri": "mongodb://localhost:27017/",
   "proxies": [
-    ""
+    "http://217.28.128.31:44444:14a97aa1b3022:ca973b97fc"
   ]
 }
