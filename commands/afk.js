@@ -1,5 +1,6 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const AfkUser = require('../models/AfkUser');
+const { EmbedBuilder } = require('discord.js');
+const AfkUser = require('../models/AfkUser'); // Ensure this path is correct
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -10,16 +11,30 @@ module.exports = {
     const message = interaction.options.getString('message', true);
 
     try {
+      // Upsert AFK status in the database
       await AfkUser.findOneAndUpdate(
         { userId: interaction.user.id },
         { message, timestamp: new Date() },
         { upsert: true, new: true }
       );
 
-      await interaction.reply({ content: `You are now AFK: ${message}`, ephemeral: true });
+      // Create the embed message
+      const embed = new EmbedBuilder()
+        .setTitle('AFK Status')
+        .setDescription(`You are now AFK: ${message}`)
+        .setColor('#00FF00')
+        .setTimestamp();
+
+      // Reply with the embed message as ephemeral
+      await interaction.reply({ embeds: [embed], ephemeral: true });
     } catch (error) {
       console.error('Error setting AFK status:', error);
-      await interaction.reply({ content: 'There was an error setting your AFK status.', ephemeral: true });
+      const embedError = new EmbedBuilder()
+        .setTitle('Error')
+        .setDescription('There was an error setting your AFK status.')
+        .setColor('#FF0000')
+        .setTimestamp();
+      await interaction.reply({ embeds: [embedError], ephemeral: true });
     }
   },
 };
