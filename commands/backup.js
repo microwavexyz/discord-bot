@@ -1,12 +1,18 @@
-const { SlashCommandBuilder } = require('@discordjs/builders');
+const { SlashCommandBuilder, PermissionFlagsBits } = require('discord.js');
 const { EmbedBuilder } = require('discord.js');
 const Backup = require('../models/Backup');
 
 module.exports = {
     data: new SlashCommandBuilder()
         .setName('backup')
-        .setDescription('Create a backup of the server configuration.'),
+        .setDescription('Create a backup of the server configuration.')
+        .setDefaultMemberPermissions(PermissionFlagsBits.Administrator),
     async execute(interaction) {
+        // Check if the user has administrator permissions
+        if (!interaction.member.permissions.has(PermissionFlagsBits.Administrator)) {
+            return interaction.reply({ content: 'You need Administrator permissions to use this command.', ephemeral: true });
+        }
+
         try {
             const guild = interaction.guild;
 

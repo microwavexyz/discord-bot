@@ -1,5 +1,5 @@
-const { SlashCommandBuilder } = require('@discordjs/builders');
-const { showModal, ModalBuilder, TextInputBuilder, ActionRowBuilder } = require('@discordjs/builders');
+const { SlashCommandBuilder, ModalBuilder, TextInputBuilder, ActionRowBuilder } = require('discord.js');
+const { TextInputStyle } = require('discord.js');
 
 module.exports = {
     data: new SlashCommandBuilder()
@@ -68,7 +68,7 @@ module.exports = {
             const textInput = new TextInputBuilder()
                 .setCustomId(question.id)
                 .setLabel(question.label.substring(0, 45))
-                .setStyle(TextInputBuilder.Styles.PARAGRAPH)
+                .setStyle(TextInputStyle.Paragraph)
                 .setPlaceholder('Enter your response here')
                 .setRequired(true);
 
@@ -76,6 +76,6 @@ module.exports = {
             modal.addComponents(actionRow);
         });
 
-        await showModal(modal, { client: interaction.client, interaction });
+        await interaction.showModal(modal);
     }
 };

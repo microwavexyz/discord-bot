@@ -13,7 +13,7 @@ module.exports = {
     const user = options.getUser('target', true);
     const durationInput = options.getString('duration', true);
     const reason = options.getString('reason') || 'No reason provided';
-    const moderator = interaction.user.tag;
+    const moderator = interaction.user;
 
     if (user.id === interaction.user.id || user.id === interaction.client.user.id) {
       const embed = new EmbedBuilder()
@@ -122,18 +122,26 @@ module.exports = {
         return;
       }
 
+      const caseNumber = await caseManager.createCase(user.tag, moderator.tag, 'timeout', reason);
+
+      // Send DM to the user being timed out
+      const dmEmbed = new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setDescription(`You have been timed out in **${interaction.guild.name}** for ${durationInput}.\n**Reason:** ${reason}\n**Moderator:** <@${moderator.id}>\n**Case Number:** ${caseNumber}`);
+
+      try {
+        await user.send({ embeds: [dmEmbed] });
+      } catch (error) {
+        console.error('Error sending DM:', error);
+      }
+
+      // Timeout the user
       await member.timeout(durationMs, reason);
-      const caseNumber = await caseManager.createCase(user.tag, moderator, 'timeout', reason);
 
       const embed = new EmbedBuilder()
         .setColor(0x00FF00)
-        .setTitle('User Timed Out')
-        .setDescription(`Timed out ${user.tag} for ${durationInput} for: ${reason}`)
-        .addFields(
-          { name: 'Case Number', value: `${caseNumber}`, inline: true },
-          { name: 'Moderator', value: `${moderator}`, inline: true }
-        )
-        .setTimestamp();
+        .setDescription(`✅ **<@${user.id}> timed out for ${durationInput}**\n**Reason:** ${reason}\n**Moderator:** <@${moderator.id}>`)
+        .setFooter({ text: `Case Number: ${caseNumber}`, iconURL: interaction.client.user.displayAvatarURL() });
 
       await interaction.reply({ embeds: [embed], ephemeral: false });
     } catch (error) {

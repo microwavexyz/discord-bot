@@ -1,13 +1,11 @@
-const { SlashCommandBuilder } = require('@discordjs/builders');
+const { SlashCommandBuilder, EmbedBuilder, PermissionFlagsBits } = require('discord.js');
 const ServerSettings = require('../models/ServerSettings');
-
-// List of authorized user IDs
-const authorizedUsers = ['452636692537540608', '1020809619343409182'];
 
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('configantinuke')
     .setDescription('Configure the anti-nuke settings')
+    .setDefaultMemberPermissions(PermissionFlagsBits.Administrator)
     .addRoleOption(option =>
       option.setName('adminrole')
         .setDescription('Set the admin role')
@@ -18,142 +16,157 @@ module.exports = {
         .setDescription('Enable or disable the anti-nuke module')
     )
     .addIntegerOption(option =>
+      option.setName('timeframe')
+        .setDescription('Time frame for tracking actions in seconds')
+        .setMinValue(10)
+        .setMaxValue(300)
+    )
+    .addIntegerOption(option =>
       option.setName('maxchannelsdeleted')
         .setDescription('Max channels that can be deleted')
+        .setMinValue(1)
+        .setMaxValue(10)
     )
     .addIntegerOption(option =>
       option.setName('maxrolesdeleted')
         .setDescription('Max roles that can be deleted')
+        .setMinValue(1)
+        .setMaxValue(10)
     )
     .addIntegerOption(option =>
       option.setName('maxrolechanges')
         .setDescription('Max role changes that can be made')
+        .setMinValue(1)
+        .setMaxValue(20)
     )
     .addIntegerOption(option =>
       option.setName('maxchannelscreated')
         .setDescription('Max channels that can be created')
+        .setMinValue(1)
+        .setMaxValue(10)
     )
     .addIntegerOption(option =>
       option.setName('maxrolescreated')
         .setDescription('Max roles that can be created')
+        .setMinValue(1)
+        .setMaxValue(10)
     )
     .addIntegerOption(option =>
       option.setName('maxmentions')
         .setDescription('Max mentions in a message')
+        .setMinValue(1)
+        .setMaxValue(50)
     )
     .addIntegerOption(option =>
       option.setName('maxnicknameschanged')
         .setDescription('Max nickname changes that can be made')
+        .setMinValue(1)
+        .setMaxValue(20)
     )
     .addIntegerOption(option =>
       option.setName('maxbotsadded')
         .setDescription('Max bots that can be added')
+        .setMinValue(1)
+        .setMaxValue(10)
     )
     .addIntegerOption(option =>
       option.setName('maxusersadded')
         .setDescription('Max users that can be added')
+        .setMinValue(1)
+        .setMaxValue(50)
     )
     .addIntegerOption(option =>
       option.setName('maxchannelrenames')
         .setDescription('Max channel renames that can be made')
+        .setMinValue(1)
+        .setMaxValue(20)
     )
     .addIntegerOption(option =>
       option.setName('maxcategoriescreated')
         .setDescription('Max categories that can be created')
+        .setMinValue(1)
+        .setMaxValue(10)
     )
     .addIntegerOption(option =>
       option.setName('maxcategoryrenames')
         .setDescription('Max category renames that can be made')
+        .setMinValue(1)
+        .setMaxValue(20)
     )
     .addIntegerOption(option =>
       option.setName('maxwebhookmessages')
         .setDescription('Max webhook messages in a timeframe')
-    )
-    .addIntegerOption(option =>
-      option.setName('timeframe')
-        .setDescription('Time frame for tracking actions in milliseconds')
+        .setMinValue(1)
+        .setMaxValue(50)
     ),
 
   async execute(interaction) {
-    const userId = interaction.user.id;
-
-    // Check if the user is authorized
-    if (!authorizedUsers.includes(userId)) {
-      await interaction.reply({ content: 'You do not have permission to use this command.', ephemeral: true });
-      return;
-    }
-
     const guildId = interaction.guild.id;
-    const enabled = interaction.options.getBoolean('enabled');
     const adminRole = interaction.options.getRole('adminrole');
-    const maxChannelsDeleted = interaction.options.getInteger('maxchannelsdeleted');
-    const maxRolesDeleted = interaction.options.getInteger('maxrolesdeleted');
-    const maxRoleChanges = interaction.options.getInteger('maxrolechanges');
-    const maxChannelsCreated = interaction.options.getInteger('maxchannelscreated');
-    const maxRolesCreated = interaction.options.getInteger('maxrolescreated');
-    const maxMentions = interaction.options.getInteger('maxmentions');
-    const maxNicknamesChanged = interaction.options.getInteger('maxnicknameschanged');
-    const maxBotsAdded = interaction.options.getInteger('maxbotsadded');
-    const maxUsersAdded = interaction.options.getInteger('maxusersadded');
-    const maxChannelRenames = interaction.options.getInteger('maxchannelrenames');
-    const maxCategoriesCreated = interaction.options.getInteger('maxcategoriescreated');
-    const maxCategoryRenames = interaction.options.getInteger('maxcategoryrenames');
-    const maxWebhookMessages = interaction.options.getInteger('maxwebhookmessages');
-    const timeFrame = interaction.options.getInteger('timeframe');
 
     if (!adminRole) {
-      await interaction.reply({ content: 'Admin role is required to configure anti-nuke settings.', ephemeral: true });
-      return;
+      return interaction.reply({ embeds: [createErrorEmbed('Admin role is required to configure anti-nuke settings.')], ephemeral: true });
     }
 
+    await interaction.deferReply();
+
     try {
-      let settings = await ServerSettings.findOne({ guildId });
+      let settings = await ServerSettings.findOne({ guildId }) || new ServerSettings({ guildId });
 
-      if (!settings) {
-        settings = new ServerSettings({
-          guildId,
-          adminRole: adminRole.id,
-          enabled: enabled ?? true,
-          maxChannelsDeleted: maxChannelsDeleted ?? 3,
-          maxRolesDeleted: maxRolesDeleted ?? 3,
-          maxRoleChanges: maxRoleChanges ?? 3,
-          maxChannelsCreated: maxChannelsCreated ?? 3,
-          maxRolesCreated: maxRolesCreated ?? 3,
-          maxMentions: maxMentions ?? 5,
-          maxNicknamesChanged: maxNicknamesChanged ?? 3,
-          maxBotsAdded: maxBotsAdded ?? 3,
-          maxUsersAdded: maxUsersAdded ?? 5,
-          maxChannelRenames: maxChannelRenames ?? 3,
-          maxCategoriesCreated: maxCategoriesCreated ?? 3,
-          maxCategoryRenames: maxCategoryRenames ?? 3,
-          maxWebhookMessages: maxWebhookMessages ?? 5,
-          timeFrame: timeFrame ?? 60000,
-        });
-      } else {
-        if (enabled !== null) settings.enabled = enabled;
-        if (adminRole) settings.adminRole = adminRole.id;
-        if (maxChannelsDeleted !== null) settings.maxChannelsDeleted = maxChannelsDeleted;
-        if (maxRolesDeleted !== null) settings.maxRolesDeleted = maxRolesDeleted;
-        if (maxRoleChanges !== null) settings.maxRoleChanges = maxRoleChanges;
-        if (maxChannelsCreated !== null) settings.maxChannelsCreated = maxChannelsCreated;
-        if (maxRolesCreated !== null) settings.maxRolesCreated = maxRolesCreated;
-        if (maxMentions !== null) settings.maxMentions = maxMentions;
-        if (maxNicknamesChanged !== null) settings.maxNicknamesChanged = maxNicknamesChanged;
-        if (maxBotsAdded !== null) settings.maxBotsAdded = maxBotsAdded;
-        if (maxUsersAdded !== null) settings.maxUsersAdded = maxUsersAdded;
-        if (maxChannelRenames !== null) settings.maxChannelRenames = maxChannelRenames;
-        if (maxCategoriesCreated !== null) settings.maxCategoriesCreated = maxCategoriesCreated;
-        if (maxCategoryRenames !== null) settings.maxCategoryRenames = maxCategoryRenames;
-        if (maxWebhookMessages !== null) settings.maxWebhookMessages = maxWebhookMessages;
-        if (timeFrame !== null) settings.timeFrame = timeFrame;
-      }
+      const options = [
+        'enabled', 'maxchannelsdeleted', 'maxrolesdeleted', 'maxrolechanges',
+        'maxchannelscreated', 'maxrolescreated', 'maxmentions', 'maxnicknameschanged',
+        'maxbotsadded', 'maxusersadded', 'maxchannelrenames', 'maxcategoriescreated',
+        'maxcategoryrenames', 'maxwebhookmessages', 'timeframe'
+      ];
 
+      options.forEach(option => {
+        const value = interaction.options.get(option)?.value;
+        if (value !== undefined) {
+          settings[option] = option === 'timeframe' ? value * 1000 : value; // Convert timeframe to milliseconds
+        }
+      });
+
+      settings.adminRole = adminRole.id;
       await settings.save();
 
-      await interaction.reply('Anti-nuke settings updated successfully!');
+      const embed = new EmbedBuilder()
+        .setColor(0x00AE86)
+        .setTitle('🛡️ Anti-Nuke Configuration Updated')
+        .setDescription('The anti-nuke settings have been updated successfully!')
+        .addFields(
+          { name: 'Admin Role', value: `<@&${settings.adminRole}>`, inline: true },
+          { name: 'Enabled', value: settings.enabled ? 'Yes' : 'No', inline: true },
+          { name: 'Time Frame', value: `${settings.timeFrame / 1000} seconds`, inline: true },
+          { name: 'Max Channels Deleted', value: `${settings.maxChannelsDeleted}`, inline: true },
+          { name: 'Max Roles Deleted', value: `${settings.maxRolesDeleted}`, inline: true },
+          { name: 'Max Role Changes', value: `${settings.maxRoleChanges}`, inline: true },
+          { name: 'Max Channels Created', value: `${settings.maxChannelsCreated}`, inline: true },
+          { name: 'Max Roles Created', value: `${settings.maxRolesCreated}`, inline: true },
+          { name: 'Max Mentions', value: `${settings.maxMentions}`, inline: true },
+          { name: 'Max Nicknames Changed', value: `${settings.maxNicknamesChanged}`, inline: true },
+          { name: 'Max Bots Added', value: `${settings.maxBotsAdded}`, inline: true },
+          { name: 'Max Users Added', value: `${settings.maxUsersAdded}`, inline: true },
+          { name: 'Max Channel Renames', value: `${settings.maxChannelRenames}`, inline: true },
+          { name: 'Max Categories Created', value: `${settings.maxCategoriesCreated}`, inline: true },
+          { name: 'Max Category Renames', value: `${settings.maxCategoryRenames}`, inline: true },
+          { name: 'Max Webhook Messages', value: `${settings.maxWebhookMessages}`, inline: true }
+        )
+        .setFooter({ text: `Requested by ${interaction.user.tag}`, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+        .setTimestamp();
+
+      await interaction.editReply({ embeds: [embed] });
     } catch (error) {
       console.error('Error updating anti-nuke settings:', error);
-      await interaction.reply({ content: 'There was an error updating the anti-nuke settings. Please try again later.', ephemeral: true });
+      await interaction.editReply({ embeds: [createErrorEmbed('There was an error updating the anti-nuke settings. Please try again later.')] });
     }
   },
 };
+
+function createErrorEmbed(description) {
+  return new EmbedBuilder()
+    .setColor(0xE74C3C)
+    .setTitle('❌ Error')
+    .setDescription(description)
+    .setTimestamp();
+}

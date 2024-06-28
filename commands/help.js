@@ -29,21 +29,24 @@ module.exports = {
         .setTimestamp();
     };
 
-    const embed = generateEmbed(currentPage);
+    const generateButtons = (page) => {
+      return new ActionRowBuilder()
+        .addComponents(
+          new ButtonBuilder()
+            .setCustomId('previous')
+            .setLabel('⬅️')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(page === 0),
+          new ButtonBuilder()
+            .setCustomId('next')
+            .setLabel('➡️')
+            .setStyle(ButtonStyle.Primary)
+            .setDisabled(page === totalPages - 1),
+        );
+    };
 
-    const buttons = new ActionRowBuilder()
-      .addComponents(
-        new ButtonBuilder()
-          .setCustomId('previous')
-          .setLabel('⬅️')
-          .setStyle(ButtonStyle.Primary)
-          .setDisabled(currentPage === 0),
-        new ButtonBuilder()
-          .setCustomId('next')
-          .setLabel('➡️')
-          .setStyle(ButtonStyle.Primary)
-          .setDisabled(currentPage === totalPages - 1),
-      );
+    const embed = generateEmbed(currentPage);
+    const buttons = generateButtons(currentPage);
 
     try {
       const message = await interaction.reply({ embeds: [embed], components: [buttons], fetchReply: true });
@@ -55,33 +58,28 @@ module.exports = {
           return i.reply({ content: 'You cannot use these buttons.', ephemeral: true });
         }
 
+        // Defer the update immediately
+        await i.deferUpdate();
+
         if (i.customId === 'previous') {
-          currentPage--;
+          currentPage = Math.max(0, currentPage - 1);
         } else if (i.customId === 'next') {
-          currentPage++;
+          currentPage = Math.min(totalPages - 1, currentPage + 1);
         }
 
         const newEmbed = generateEmbed(currentPage);
-        const newButtons = new ActionRowBuilder()
-          .addComponents(
-            new ButtonBuilder()
-              .setCustomId('previous')
-              .setLabel('⬅️')
-              .setStyle(ButtonStyle.Primary)
-              .setDisabled(currentPage === 0),
-            new ButtonBuilder()
-              .setCustomId('next')
-              .setLabel('➡️')
-              .setStyle(ButtonStyle.Primary)
-              .setDisabled(currentPage === totalPages - 1),
-          );
+        const newButtons = generateButtons(currentPage);
 
-        await i.update({ embeds: [newEmbed], components: [newButtons] });
+        // Edit the message with new content
+        await i.editReply({ embeds: [newEmbed], components: [newButtons] });
       });
 
       collector.on('end', async () => {
+        const finalButtons = generateButtons(currentPage);
+        finalButtons.components.forEach(button => button.setDisabled(true));
+        
         try {
-          await interaction.editReply({ components: [] });
+          await interaction.editReply({ components: [finalButtons] });
         } catch (error) {
           console.error('Failed to edit reply after collector end:', error);
         }

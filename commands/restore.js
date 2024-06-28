@@ -47,7 +47,6 @@ async function restoreRoles(guild, roleData, interaction, loadingMessage) {
 
 async function restoreChannels(guild, channelData, interaction, loadingMessage) {
     try {
-        console.log('Restoring channel:', channelData);
         let channel = guild.channels.cache.get(channelData.id);
         if (channel) {
             await channel.edit({
@@ -89,8 +88,27 @@ module.exports = {
     data: new SlashCommandBuilder()
         .setName('restore')
         .setDescription('Restore the server configuration from a backup.')
-        .addIntegerOption(option => option.setName('backupnumber').setDescription('The backup number to restore').setRequired(true)),
+        .addIntegerOption(option => option.setName('backupnumber').setDescription('The backup number to restore').setRequired(true))
+        .setDefaultMemberPermissions(PermissionsBitField.Flags.Administrator),
     async execute(interaction) {
+        // Check if the user has administrator permissions
+        if (!interaction.member.permissions.has(PermissionsBitField.Flags.Administrator)) {
+            return interaction.reply({ content: 'You need Administrator permissions to use this command.', ephemeral: true });
+        }
+
+        // Check if the bot has necessary permissions
+        const botMember = interaction.guild.members.me;
+        const requiredPermissions = [
+            PermissionsBitField.Flags.ManageRoles,
+            PermissionsBitField.Flags.ManageChannels,
+            PermissionsBitField.Flags.ManageGuild
+        ];
+
+        if (!botMember.permissions.has(requiredPermissions)) {
+            const missingPermissions = requiredPermissions.filter(perm => !botMember.permissions.has(perm));
+            return interaction.reply({ content: `I'm missing the following permissions: ${missingPermissions.join(', ')}`, ephemeral: true });
+        }
+
         await interaction.deferReply({ ephemeral: true });
 
         const guild = interaction.guild;
@@ -128,6 +146,12 @@ module.exports = {
                 .setTimestamp();
 
             await interaction.followUp({ embeds: [embed], ephemeral: true });
+
+            // Log the restore action
+            const logChannel = guild.channels.cache.find(channel => channel.name === 'mod-logs');
+            if (logChannel) {
+                await logChannel.send(`Server configuration restored from backup #${backupNumber} by ${interaction.user.tag}`);
+            }
         } catch (error) {
             console.error('Error restoring server:', error);
             await interaction.followUp({ content: 'An error occurred while restoring the server configuration.', ephemeral: true });

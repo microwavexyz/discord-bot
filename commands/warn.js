@@ -11,7 +11,7 @@ module.exports = {
     const options = interaction.options;
     const user = options.getUser('user', true);
     const reason = options.getString('reason', true);
-    const moderator = interaction.user.tag;
+    const moderator = interaction.user;
 
     if (user.id === interaction.user.id || user.id === interaction.client.user.id) {
       const embed = new EmbedBuilder()
@@ -42,18 +42,23 @@ module.exports = {
 
     try {
       const warningId = await caseManager.addWarning(user.id, reason);
-      const caseNumber = await caseManager.createCase(user.tag, moderator, 'warn', reason);
+      const caseNumber = await caseManager.createCase(user.tag, moderator.tag, 'warn', reason);
+
+      // Send DM to the user being warned
+      const dmEmbed = new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setDescription(`You have been warned in **${interaction.guild.name}**\n**Reason:** ${reason}\n**Moderator:** <@${moderator.id}>\n**Case Number:** ${caseNumber}`);
+
+      try {
+        await user.send({ embeds: [dmEmbed] });
+      } catch (error) {
+        console.error('Error sending DM:', error);
+      }
 
       const embed = new EmbedBuilder()
         .setColor(0xFFA500)
-        .setTitle('User Warned')
-        .setDescription(`Warned ${user.tag} for: ${reason}`)
-        .addFields(
-          { name: 'Case Number', value: `${caseNumber}`, inline: true },
-          { name: 'Warning ID', value: `${warningId}`, inline: true },
-          { name: 'Moderator', value: `${moderator}`, inline: true }
-        )
-        .setTimestamp();
+        .setDescription(`⚠️ **<@${user.id}> warned**\n**Reason:** ${reason}\n**Moderator:** <@${moderator.id}>`)
+        .setFooter({ text: `Case Number: ${caseNumber}`, iconURL: interaction.client.user.displayAvatarURL() });
 
       await interaction.reply({ embeds: [embed], ephemeral: false });
     } catch (error) {

@@ -22,7 +22,7 @@ module.exports = {
     const target = options.getUser('target', true);
     const duration = options.getInteger('duration', true);
     const reason = options.getString('reason') || 'No reason provided';
-    const moderator = interaction.user.tag;
+    const moderator = interaction.user;
 
     if (target.id === interaction.user.id || target.id === interaction.client.user.id) {
       const embed = new EmbedBuilder()
@@ -54,19 +54,26 @@ module.exports = {
     }
 
     try {
+      const caseNumber = await caseManager.createCase(target.tag, moderator.tag, 'tempban', reason);
+
+      // Send DM to the user being tempbanned
+      const dmEmbed = new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setDescription(`You have been temporarily banned from **${interaction.guild.name}** for ${duration} minutes.\n**Reason:** ${reason}\n**Moderator:** <@${moderator.id}>\n**Case Number:** ${caseNumber}`);
+
+      try {
+        await target.send({ embeds: [dmEmbed] });
+      } catch (error) {
+        console.error('Error sending DM:', error);
+      }
+
+      // Temporarily ban the user
       await member.ban({ reason });
-      const caseNumber = await caseManager.createCase(target.tag, moderator, 'tempban', reason);
 
       const embed = new EmbedBuilder()
         .setColor(0x00FF00)
-        .setTitle('User Temporarily Banned')
-        .setDescription(`${target.tag} has been temporarily banned for ${duration} minutes.`)
-        .addFields(
-          { name: 'Reason', value: reason, inline: true },
-          { name: 'Case Number', value: `${caseNumber}`, inline: true },
-          { name: 'Moderator', value: moderator, inline: true }
-        )
-        .setTimestamp();
+        .setDescription(`✅ **<@${target.id}> temporarily banned for ${duration} minutes**\n**Reason:** ${reason}\n**Moderator:** <@${moderator.id}>`)
+        .setFooter({ text: `Case Number: ${caseNumber}`, iconURL: interaction.client.user.displayAvatarURL() });
 
       await interaction.reply({ embeds: [embed], ephemeral: false });
 

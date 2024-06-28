@@ -1,5 +1,5 @@
 const { SlashCommandBuilder } = require('@discordjs/builders');
-const { ChannelType, PermissionsBitField } = require('discord.js');
+const { ChannelType, PermissionsBitField, EmbedBuilder } = require('discord.js');
 
 module.exports = {
   data: new SlashCommandBuilder()
@@ -11,7 +11,6 @@ module.exports = {
         .setRequired(true)),
   async execute(interaction) {
     const suggestion = interaction.options.getString('suggestion', true);
-
     const guild = interaction.guild;
 
     let suggestionsChannel = guild.channels.cache.find(channel => channel.name === 'suggestions' && channel.type === ChannelType.GuildText);
@@ -37,10 +36,25 @@ module.exports = {
     }
 
     try {
-      const suggestionMessage = await suggestionsChannel.send(`New suggestion from ${interaction.user}:\n${suggestion}`);
+      const suggestionEmbed = new EmbedBuilder()
+        .setColor('#0099ff')
+        .setTitle('New Suggestion')
+        .setAuthor({ name: interaction.user.tag, iconURL: interaction.user.displayAvatarURL({ dynamic: true }) })
+        .setDescription(suggestion)
+        .setTimestamp()
+        .setFooter({ text: `Suggestion ID: ${Date.now()}` });
+
+      const suggestionMessage = await suggestionsChannel.send({ embeds: [suggestionEmbed] });
       await suggestionMessage.react('👍');
       await suggestionMessage.react('👎');
-      await interaction.reply({ content: 'Thank you for your suggestion!', ephemeral: true });
+
+      const replyEmbed = new EmbedBuilder()
+        .setColor('#00ff00')
+        .setTitle('Suggestion Submitted')
+        .setDescription(`Your suggestion has been successfully submitted to ${suggestionsChannel}.`)
+        .addFields({ name: 'Your Suggestion', value: suggestion });
+
+      await interaction.reply({ embeds: [replyEmbed], ephemeral: true });
     } catch (error) {
       console.error('Error sending suggestion message:', error);
       await interaction.reply({ content: 'There was an error sending your suggestion!', ephemeral: true });

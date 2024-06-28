@@ -17,7 +17,7 @@ module.exports = {
     const options = interaction.options;
     const target = options.getUser('target', true);
     const reason = options.getString('reason') || 'No reason provided';
-    const moderator = interaction.user.tag;
+    const moderator = interaction.user;
 
     const member = await interaction.guild?.members.fetch(target.id).catch(() => null);
 
@@ -40,20 +40,27 @@ module.exports = {
     }
 
     try {
+      const caseNumber = await caseManager.createCase(target.tag, moderator.tag, 'softban', reason);
+
+      // Send DM to the user being softbanned
+      const dmEmbed = new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setDescription(`You have been softbanned from **${interaction.guild.name}**\n**Reason:** ${reason}\n**Moderator:** <@${moderator.id}>\n**Case Number:** ${caseNumber}`);
+
+      try {
+        await target.send({ embeds: [dmEmbed] });
+      } catch (error) {
+        console.error('Error sending DM:', error);
+      }
+
+      // Softban the user
       await member.ban({ reason, deleteMessageDays: 7 });
       await interaction.guild?.members.unban(target.id, 'Softban');
-      const caseNumber = await caseManager.createCase(target.tag, moderator, 'softban', reason);
 
       const embed = new EmbedBuilder()
         .setColor(0x00FF00)
-        .setTitle('User Softbanned')
-        .setDescription(`${target.tag} has been softbanned.`)
-        .addFields(
-          { name: 'Reason', value: reason, inline: true },
-          { name: 'Case Number', value: `${caseNumber}`, inline: true },
-          { name: 'Moderator', value: moderator, inline: true }
-        )
-        .setTimestamp();
+        .setDescription(`✅ **<@${target.id}> softbanned**\n**Reason:** ${reason}\n**Moderator:** <@${moderator.id}>`)
+        .setFooter({ text: `Case Number: ${caseNumber}`, iconURL: interaction.client.user.displayAvatarURL() });
 
       await interaction.reply({ embeds: [embed], ephemeral: false });
     } catch (error) {

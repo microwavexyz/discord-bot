@@ -11,7 +11,7 @@ module.exports = {
     const options = interaction.options;
     const user = options.getUser('target', true);
     const reason = options.getString('reason') || 'No reason provided';
-    const moderator = interaction.user.tag;
+    const moderator = interaction.user;
 
     if (!interaction.guild?.members.me?.permissions.has(PermissionsBitField.Flags.KickMembers)) {
       const embed = new EmbedBuilder()
@@ -51,27 +51,37 @@ module.exports = {
         return;
       }
 
+      const caseNumber = await caseManager.createCase(user.tag, moderator.tag, 'kick', reason);
+
+      // Send DM to the user being kicked
+      const dmEmbed = new EmbedBuilder()
+        .setColor(0xFF0000)
+        .setDescription(`You have been kicked from **${interaction.guild.name}**\n**Reason:** ${reason}\n**Moderator:** <@${moderator.id}>\n**Case Number:** ${caseNumber}`);
+
+      try {
+        await user.send({ embeds: [dmEmbed] });
+      } catch (error) {
+        console.error('Error sending DM:', error);
+      }
+
+      // Kick the user
       await member.kick(reason);
-      const caseNumber = await caseManager.createCase(user.tag, moderator, 'kick', reason);
 
       const embed = new EmbedBuilder()
         .setColor(0x00FF00)
-        .setTitle('User Kicked')
-        .setDescription(`Kicked ${user.tag} for: ${reason}`)
-        .addFields(
-          { name: 'Case Number', value: `${caseNumber}`, inline: true },
-          { name: 'Moderator', value: `${moderator}`, inline: true }
-        )
-        .setTimestamp();
+        .setDescription(`✅ **<@${user.id}> kicked**\n**Reason:** ${reason}\n**Moderator:** <@${moderator.id}>`)
+        .setFooter({ text: `Case Number: ${caseNumber}`, iconURL: interaction.client.user.displayAvatarURL() });
 
       await interaction.reply({ embeds: [embed], ephemeral: false });
     } catch (error) {
       console.error(error);
-      const embed = new EmbedBuilder()
-        .setColor(0xFF0000)
-        .setTitle('Error')
-        .setDescription('An error occurred while trying to kick the user.');
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      if (!interaction.replied) {
+        const embed = new EmbedBuilder()
+          .setColor(0xFF0000)
+          .setTitle('Error')
+          .setDescription('An error occurred while trying to kick the user.');
+        await interaction.reply({ embeds: [embed], ephemeral: true });
+      }
     }
   },
 };

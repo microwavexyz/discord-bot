@@ -4,83 +4,65 @@ const caseManager = require('../utils/casemanager');
 module.exports = {
   data: new SlashCommandBuilder()
     .setName('ban')
-    .setDescription('Bans a user')
+    .setDescription('Bans a user from the server')
     .addUserOption(option => option.setName('target').setDescription('The user to ban').setRequired(true))
     .addStringOption(option => option.setName('reason').setDescription('Reason for banning')),
   async execute(interaction) {
-    const options = interaction.options;
-    const user = options.getUser('target', true);
-    const reason = options.getString('reason') || 'No reason provided';
-    const moderator = interaction.user.tag;
+    const user = interaction.options.getUser('target', true);
+    const reason = interaction.options.getString('reason') || 'No reason provided';
+    const moderator = interaction.user;
 
-    if (user.id === interaction.user.id) {
-      const embed = new EmbedBuilder()
-        .setColor(0xFF0000)
-        .setTitle('Action Denied')
-        .setDescription('You cannot ban yourself.');
-      await interaction.reply({ embeds: [embed], ephemeral: true });
-      return;
-    }
-
-    if (!interaction.guild?.members.me?.permissions.has(PermissionsBitField.Flags.BanMembers)) {
-      const embed = new EmbedBuilder()
-        .setColor(0xFF0000)
-        .setTitle('Permission Denied')
-        .setDescription('I do not have permission to ban users in this server.');
-      await interaction.reply({ embeds: [embed], ephemeral: true });
-      return;
-    }
-
-    if (!interaction.memberPermissions?.has(PermissionsBitField.Flags.BanMembers)) {
-      const embed = new EmbedBuilder()
-        .setColor(0xFF0000)
-        .setTitle('Permission Denied')
-        .setDescription('You do not have permission to ban users in this server.');
-      await interaction.reply({ embeds: [embed], ephemeral: true });
-      return;
+    if (user.id === moderator.id || !interaction.guild?.members.me?.permissions.has(PermissionsBitField.Flags.BanMembers) || !interaction.memberPermissions?.has(PermissionsBitField.Flags.BanMembers)) {
+      return interaction.reply({ embeds: [createErrorEmbed(user.id === moderator.id ? 'Self-ban Attempt' : 'Permission Denied', user.id === moderator.id ? 'You cannot ban yourself.' : `${interaction.guild?.members.me?.permissions.has(PermissionsBitField.Flags.BanMembers) ? 'You do' : 'I do'} not have permission to ban users.`)], ephemeral: true });
     }
 
     try {
-      const member = await interaction.guild?.members.fetch(user.id);
-      if (!member) {
-        const embed = new EmbedBuilder()
-          .setColor(0xFF0000)
-          .setTitle('User Not Found')
-          .setDescription('User not found in this server.');
-        await interaction.reply({ embeds: [embed], ephemeral: true });
-        return;
+      const member = await interaction.guild.members.fetch(user.id);
+      if (!member || !member.bannable) {
+        return interaction.reply({ embeds: [createErrorEmbed('Action Denied', member ? 'I cannot ban this user due to role hierarchy.' : 'User not found in this server.')], ephemeral: true });
       }
 
-      if (!member.bannable) {
-        const embed = new EmbedBuilder()
-          .setColor(0xFF0000)
-          .setTitle('Action Denied')
-          .setDescription('I cannot ban this user due to role hierarchy.');
-        await interaction.reply({ embeds: [embed], ephemeral: true });
-        return;
-      }
+      const caseNumber = await caseManager.createCase(user.tag, moderator.tag, 'ban', reason);
 
+      await member.send({ embeds: [createDMEmbed(interaction.guild.name, reason, moderator.id, caseNumber)] }).catch(() => console.log(`Failed to send DM to ${user.tag}`));
       await member.ban({ reason });
-      const caseNumber = await caseManager.createCase(user.tag, moderator, 'ban', reason);
 
       const embed = new EmbedBuilder()
-        .setColor(0x00FF00)
-        .setTitle('User Banned')
-        .setDescription(`Banned ${user.tag} for: ${reason}`)
-        .addFields(
-          { name: 'Case Number', value: `${caseNumber}`, inline: true },
-          { name: 'Moderator', value: `${moderator}`, inline: true }
-        )
+        .setColor(0x2ECC71)
+        .setAuthor({ name: 'User Banned', iconURL: user.displayAvatarURL({ dynamic: true }) })
+        .setDescription([
+          `**Target:** ${user} (\`${user.tag}\`)`,
+          `**Reason:** ${reason}`,
+          `**Moderator:** ${moderator} (\`${moderator.tag}\`)`,
+          `**Case Number:** \`#${caseNumber}\``
+        ].join('\n'))
+        .setFooter({ text: `ID: ${user.id}` })
         .setTimestamp();
 
-      await interaction.reply({ embeds: [embed], ephemeral: false });
+      return interaction.reply({ embeds: [embed] });
     } catch (error) {
       console.error(error);
-      const embed = new EmbedBuilder()
-        .setColor(0xFF0000)
-        .setTitle('Error')
-        .setDescription('An error occurred while trying to ban the user.');
-      await interaction.reply({ embeds: [embed], ephemeral: true });
+      return interaction.reply({ embeds: [createErrorEmbed('Error', 'An error occurred while trying to ban the user.')], ephemeral: true });
     }
   },
 };
+
+function createErrorEmbed(title, description) {
+  return new EmbedBuilder()
+    .setColor(0xE74C3C)
+    .setTitle(`❌ ${title}`)
+    .setDescription(description)
+    .setTimestamp();
+}
+
+function createDMEmbed(guildName, reason, moderatorId, caseNumber) {
+  return new EmbedBuilder()
+    .setColor(0xE74C3C)
+    .setTitle(`🔨 Banned from ${guildName}`)
+    .setDescription([
+      `**Reason:** ${reason}`,
+      `**Moderator:** <@${moderatorId}>`,
+      `**Case Number:** \`#${caseNumber}\``
+    ].join('\n'))
+    .setTimestamp();
+}

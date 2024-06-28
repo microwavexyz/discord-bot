@@ -11,7 +11,7 @@ module.exports = {
     const options = interaction.options;
     const user = options.getUser('target', true);
     const reason = options.getString('reason') || 'No reason provided';
-    const moderator = interaction.user.tag;
+    const moderator = interaction.user;
 
     if (!interaction.guild?.members.me?.permissions.has(PermissionsBitField.Flags.BanMembers)) {
       const embed = new EmbedBuilder()
@@ -32,7 +32,7 @@ module.exports = {
     }
 
     try {
-      const ban = await interaction.guild.bans.fetch(user.id);
+      const ban = await interaction.guild.bans.fetch(user.id).catch(() => null);
 
       if (!ban) {
         const embed = new EmbedBuilder()
@@ -43,18 +43,25 @@ module.exports = {
         return;
       }
 
+      const caseNumber = await caseManager.createCase(user.tag, moderator.tag, 'unban', reason);
+
+      // Send DM to the user being unbanned
+      const dmEmbed = new EmbedBuilder()
+        .setColor(0x00FF00)
+        .setDescription(`You have been unbanned from **${interaction.guild.name}**\n**Reason:** ${reason}\n**Moderator:** <@${moderator.id}>\n**Case Number:** ${caseNumber}`);
+
+      try {
+        await user.send({ embeds: [dmEmbed] });
+      } catch (error) {
+        console.error('Error sending DM:', error);
+      }
+
       await interaction.guild.bans.remove(user.id, reason);
-      const caseNumber = await caseManager.createCase(user.tag, moderator, 'unban', reason);
 
       const embed = new EmbedBuilder()
         .setColor(0x00FF00)
-        .setTitle('User Unbanned')
-        .setDescription(`Unbanned ${user.tag} for: ${reason}`)
-        .addFields([
-          { name: 'Case Number', value: `${caseNumber}`, inline: true },
-          { name: 'Moderator', value: `${moderator}`, inline: true }
-        ])
-        .setTimestamp();
+        .setDescription(`✅ **<@${user.id}> unbanned**\n**Reason:** ${reason}\n**Moderator:** <@${moderator.id}>`)
+        .setFooter({ text: `Case Number: ${caseNumber}`, iconURL: interaction.client.user.displayAvatarURL() });
 
       await interaction.reply({ embeds: [embed], ephemeral: false });
     } catch (error) {
