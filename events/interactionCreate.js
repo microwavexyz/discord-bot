@@ -144,8 +144,11 @@ async function handleModalSubmit(interaction) {
 }
 
 async function handleButtonInteraction(interaction) {
+    if (interaction.customId !== 'accept' && interaction.customId !== 'deny') {
+        return;
+    }
+
     try {
-        // Check if the message still exists
         const message = await interaction.channel.messages.fetch(interaction.message.id).catch(() => null);
         if (!message) {
             console.log('Message no longer exists, cannot update.');
