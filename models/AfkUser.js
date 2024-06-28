@@ -4,16 +4,16 @@ const afkUserSchema = new mongoose.Schema({
   userId: {
     type: String,
     required: true,
-    unique: true,
+    unique: true
   },
   message: {
     type: String,
-    required: true,
+    required: true
   },
   timestamp: {
     type: Date,
-    default: Date.now,
-  },
+    default: Date.now
+  }
 });
 
 module.exports = mongoose.model('AfkUser', afkUserSchema);
