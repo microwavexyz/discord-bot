@@ -7,6 +7,17 @@ dotenv.config();
 
 const config = require('./config.json');
 
+// Connect to MongoDB first
+mongoose.connect(process.env.MONGO_URI)
+  .then(() => console.log('Connected to MongoDB'))
+  .catch(err => {
+    console.error('MongoDB connection error:', err);
+    process.exit(1);
+  });
+
+// Load models
+require('./models/AntiDiscord');
+require('./models/AntiCaps');
 const {
     handleChannelDelete,
     handleRoleDelete,
@@ -24,6 +35,10 @@ const {
 
 const { handleMessage: handleSpamMessage } = require('./modules/antiSpam');
 const { handleMessage: handleLinkMessage } = require('./modules/antiLink');
+const handleAntiSelfBot = require('./modules/antiSelfBot');
+const handleAntiDiscord = require('./modules/antiDiscord');
+const handleAntiCaps = require('./modules/antiCaps');
+const { handleMessage: handleAntiGhostPing } = require('./modules/antiGhostPing');
 
 const client = new Client({
     intents: [
@@ -37,7 +52,6 @@ const client = new Client({
 
 client.commands = new Collection();
 
-// Load commands
 const commandFiles = fs.readdirSync(path.join(__dirname, 'commands')).filter(file => file.endsWith('.js'));
 for (const file of commandFiles) {
     const command = require(`./commands/${file}`);
@@ -48,7 +62,6 @@ for (const file of commandFiles) {
     }
 }
 
-// Load events
 const eventFiles = fs.readdirSync(path.join(__dirname, 'events')).filter(file => file.endsWith('.js'));
 for (const file of eventFiles) {
     const event = require(`./events/${file}`);
@@ -63,7 +76,6 @@ for (const file of eventFiles) {
     }
 }
 
-// Anti-nuke handlers
 const antiNukeHandlers = {
     channelDelete: handleChannelDelete,
     roleDelete: handleRoleDelete,
@@ -91,7 +103,6 @@ for (const [event, handler] of Object.entries(antiNukeHandlers)) {
     }
 }
 
-// Anti-spam and anti-link handlers
 if (typeof handleSpamMessage === 'function') {
     client.on('messageCreate', handleSpamMessage);
 } else {
@@ -104,7 +115,6 @@ if (typeof handleLinkMessage === 'function') {
     console.error('Anti-Link handler is not a function');
 }
 
-// Other event handlers
 client.on('messageDelete', async (message) => {
     try {
         const messageDelete = require('./events/messageDelete');
@@ -127,7 +137,6 @@ client.on('messageCreate', async (message) => {
         }
     }
 
-    // Handle webhook messages
     if (message.webhookId) {
         try {
             await handleWebhookMessage(message);
@@ -135,15 +144,31 @@ client.on('messageCreate', async (message) => {
             console.error('Error handling webhook message:', error);
         }
     }
+
+    try {
+        await handleAntiSelfBot(message);
+    } catch (error) {
+        console.error('Error handling anti-selfbot:', error);
+    }
+
+    try {
+        await handleAntiDiscord(message);
+    } catch (error) {
+        console.error('Error handling anti-discord:', error.message);
+        console.error(error.stack);
+    }
+
+    try {
+        await handleAntiCaps(message);
+    } catch (error) {
+        console.error('Error handling anti-caps:', error);
+    }
+
+    try {
+        await handleAntiGhostPing(message);
+    } catch (error) {
+        console.error('Error handling anti-ghost-ping:', error);
+    }
 });
 
-// Connect to MongoDB
-mongoose.connect(process.env.MONGO_URI).then(() => {
-    console.log('Connected to MongoDB');
-}).catch(err => {
-    console.error('MongoDB connection error:', err);
-    process.exit(1);
-});
-
-// Login to Discord
 client.login(config.token);
