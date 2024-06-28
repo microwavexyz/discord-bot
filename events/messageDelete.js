@@ -1,5 +1,4 @@
 const { EmbedBuilder, Colors, ChannelType } = require('discord.js');
-const AntiGhostPing = require('../models/AntiGhostPing');
 
 module.exports = {
     name: 'messageDelete',
@@ -14,29 +13,27 @@ module.exports = {
         }
 
         try {
-            const guildId = message.guild.id;
-            const settings = await AntiGhostPing.findOne({ guildId });
+            const logChannel = message.guild.channels.cache.find(ch => ch.name === 'message-log' && ch.type === ChannelType.GuildText);
+            if (!logChannel) return;
 
-            if (!settings || !settings.enabled) return;
+            const embed = new EmbedBuilder()
+                .setTitle('Message Deleted')
+                .setDescription(`A message by ${message.author?.tag || 'Unknown User'} was deleted in ${message.channel}.`)
+                .addFields(
+                    { name: 'Content', value: message.content || '[No Content]' },
+                    { name: 'Message ID', value: message.id },
+                    { name: 'Channel', value: `<#${message.channel.id}>` }
+                )
+                .setTimestamp()
+                .setColor(Colors.Orange);
 
-            if (message.mentions.users.size > 0) {
-                const ghostPingChannel = message.guild.channels.cache.find(ch => ch.name === 'ghost-ping-log' && ch.type === ChannelType.GuildText);
-                if (!ghostPingChannel) return;
-
-                const embed = new EmbedBuilder()
-                    .setTitle('Ghost Ping Detected')
-                    .setDescription(`A message by ${message.author?.tag || 'Unknown'} was deleted.`)
-                    .addFields(
-                        { name: 'Content', value: message.content || '[No Content]' },
-                        { name: 'Mentions', value: message.mentions.users.map(user => user.tag).join(', ') || '[No Mentions]' }
-                    )
-                    .setTimestamp()
-                    .setColor(Colors.Red);
-
-                await ghostPingChannel.send({ embeds: [embed] });
+            if (message.attachments.size > 0) {
+                embed.addFields({ name: 'Attachments', value: message.attachments.map(a => a.name).join(', ') });
             }
+
+            await logChannel.send({ embeds: [embed] });
         } catch (error) {
-            console.error('Error handling ghost ping detection:', error);
+            console.error('Error logging deleted message:', error);
         }
     },
 };

@@ -1,4 +1,4 @@
-const { Events } = require('discord.js');
+const { Events, EmbedBuilder } = require('discord.js');
 const AfkUser = require('../models/AfkUser');
 
 module.exports = {
@@ -7,28 +7,43 @@ module.exports = {
     if (message.author.bot) return;
 
     try {
-      // Check if the message mentions an AFK user
-      const mentionedUsers = message.mentions.users;
-
-      if (mentionedUsers.size > 0) {
-        const afkPromises = mentionedUsers.map(user =>
-          AfkUser.findOne({ userId: user.id }).then(afkUser => {
-            if (afkUser) {
-              message.channel.send(`${user.username} is currently AFK: ${afkUser.message}`);
-            }
-          })
-        );
-        await Promise.all(afkPromises);
-      }
-
-      // Check if the message author is AFK and remove the AFK status
-      const afkUser = await AfkUser.findOne({ userId: message.author.id });
-      if (afkUser) {
-        await AfkUser.deleteOne({ userId: message.author.id });
-        message.channel.send(`${message.author.username} is no longer AFK.`);
-      }
+      await Promise.all([
+        handleMentionedAfkUsers(message),
+        handleAuthorAfkStatus(message)
+      ]);
     } catch (error) {
       console.error('Error handling AFK status:', error);
     }
   },
 };
+
+async function handleMentionedAfkUsers(message) {
+  const mentionedUsers = message.mentions.users;
+  if (mentionedUsers.size === 0) return;
+
+  const afkUsers = await AfkUser.find({
+    userId: { $in: Array.from(mentionedUsers.keys()) }
+  });
+
+  for (const afkUser of afkUsers) {
+    const user = mentionedUsers.get(afkUser.userId);
+    const embed = createAfkEmbed(user.username, afkUser.message, '#FFFF00', 'AFK User');
+    await message.channel.send({ embeds: [embed] });
+  }
+}
+
+async function handleAuthorAfkStatus(message) {
+  const afkUser = await AfkUser.findOneAndDelete({ userId: message.author.id });
+  if (!afkUser) return;
+
+  const embed = createAfkEmbed(message.author.username, 'is no longer AFK.', '#00FF00', 'AFK Status Removed');
+  await message.channel.send({ embeds: [embed] });
+}
+
+function createAfkEmbed(username, description, color, title) {
+  return new EmbedBuilder()
+    .setTitle(title)
+    .setDescription(`${username} ${description}`)
+    .setColor(color)
+    .setTimestamp();
+}
