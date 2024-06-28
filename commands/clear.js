@@ -4,13 +4,12 @@ module.exports = {
   data: new SlashCommandBuilder()
     .setName('clear')
     .setDescription('Clears a specified number of messages')
-    .addIntegerOption(option => 
+    .addIntegerOption(option =>
       option.setName('amount')
         .setDescription('The number of messages to clear')
         .setRequired(true)
         .setMinValue(1)
         .setMaxValue(100)),
-
   async execute(interaction) {
     const amount = interaction.options.getInteger('amount');
     const channel = interaction.channel;
@@ -41,15 +40,10 @@ module.exports = {
         .setFooter({ text: `${messages.size - deletedMessages.size} message${messages.size - deletedMessages.size === 1 ? ' was' : 's were'} not deleted (pinned or too old)` })
         .setTimestamp();
 
-      await interaction.editReply({ embeds: [embed] });
-
-      // Send a temporary message in the channel
-      const tempMsg = await channel.send({ embeds: [embed] });
-      setTimeout(() => tempMsg.delete().catch(() => {}), 5000);
-
+      await interaction.editReply({ embeds: [embed], ephemeral: true });
     } catch (error) {
       console.error(error);
-      await interaction.editReply({ embeds: [createErrorEmbed('Error', 'There was an error trying to clear messages in this channel!')] });
+      await interaction.editReply({ embeds: [createErrorEmbed('Error', 'There was an error trying to clear messages in this channel!')], ephemeral: true });
     }
   },
 };
